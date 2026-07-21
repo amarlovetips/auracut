@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuraCut - Advanced Video CRF Editor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✂️</text></svg>">
+  <!-- Google Fonts for premium typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1.2">
+</head>
+<body>
+  <!-- Precision Color Shift SVG Filter (0.1% alteration on primary channels) -->
+  <svg style="position: absolute; width: 0; height: 0;" width="0" height="0">
+    <filter id="color-shift-filter">
+      <feColorMatrix type="matrix" values="
+        1.001 0.000 0.000 0 0
+        0.000 0.999 0.000 0 0
+        0.000 0.000 1.001 0 0
+        0.000 0.000 0.000 1 0" />
+    </filter>
+  </svg>
+
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="23 7 16 12 23 17 23 7" fill="url(#neon-grad)"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="3" ry="3" fill="rgba(6, 182, 212, 0.15)"></rect>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>AuraCut</h1>
+          <span>CRF VIDEO ENGINE</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span class="status-text">Engine Ready</span>
+      </div>
+    </header>
+
+    <main class="editor-layout">
+      <!-- Left Panel: Preview and Analysis -->
+      <section class="preview-panel flex-col" style="gap: 24px;">
+        <div class="card viewer-card" style="flex-grow: 0;">
+          <div class="card-header">
+            <h2><span class="icon">📺</span> Monitor & Output</h2>
+            <div style="display: flex; gap: 8px;">
+              <div class="badge preview-badge">1080p Target</div>
+              <div class="badge format-badge" id="format-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--neon-green); border: 1px solid rgba(16, 185, 129, 0.3);">MP4 Ready</div>
+            </div>
+          </div>
+          
+          <div class="video-workspace" style="min-height: unset; height: auto; margin: 16px; background-color: rgba(5, 7, 14, 0.9); border-radius: 12px; border: 1px dashed rgba(255, 255, 255, 0.1); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+            <!-- Upload Drag & Drop Zone -->
+            <div class="upload-zone" id="upload-zone">
+              <div class="upload-graphic">
+                <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 2v14M12 2l-4 4M12 2l4 4" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M22 17v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </div>
+              <h3>Drag & Drop Video Here</h3>
+              <p>Supports MP4, WebM, QuickTime up to 100MB</p>
+              <button class="btn btn-secondary" id="browse-btn">Browse Files</button>
+              <input type="file" id="video-input" accept="video/*" style="display: none;">
+            </div>
+
+            <!-- Video Processing Elements (Hidden original video) -->
+            <video id="source-video" style="display: none;" crossOrigin="anonymous" muted></video>
+
+            <!-- Render Pipeline Canvas (Visible Output) -->
+            <div class="canvas-wrapper" id="canvas-wrapper" style="display: none; width: 100%; height: auto; justify-content: center; align-items: center; position: relative;">
+              <canvas id="render-canvas" style="max-height: 520px; width: auto; max-width: 100%; height: auto; display: block; margin: 0 auto; object-fit: contain; background: #000; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);"></canvas>
+              <div class="overlay-badge render-status">PREVIEWING</div>
+              
+              <!-- Floating Processing Loader -->
+              <div class="processing-loader" id="processing-loader" style="display: none;">
+                <div class="spinner"></div>
+                <div class="loader-text">Exporting Video...</div>
+                <div class="loader-percentage" id="export-progress">0%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Controls Bar -->
+          <div class="media-controls" style="display: none;" id="media-controls-bar">
+            <button class="btn-icon" id="play-pause-btn" title="Play/Pause">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            </button>
+            <div class="progress-container">
+              <span class="time-display" id="current-time">00:00</span>
+              <div class="timeline" id="timeline-slider">
+                <div class="timeline-fill" id="timeline-progress"></div>
+              </div>
+              <span class="time-display" id="duration-time">00:00</span>
+            </div>
+            <button class="btn-icon" id="mute-btn" title="Mute/Unmute">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Digital Identity & Frequency Fingerprint Card (Stretched wide below preview) -->
+        <div class="card identity-card" id="identity-card-wrapper" style="display: none;">
+          <div class="card-header">
+            <h2><span class="icon">🆔</span> Identity & Frequency Fingerprint</h2>
+            <div class="badge success-badge" style="background: rgba(6, 182, 212, 0.15); color: var(--neon-cyan); border-color: rgba(6, 182, 212, 0.3);">Unique</div>
+          </div>
+          <div class="card-body" style="padding: 20px; overflow-x: auto;">
+            <table class="identity-table" style="width: 100%; border-collapse: collapse; text-align: left; min-width: 550px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color); color: var(--color-text-muted); font-size: 0.78rem;">
+                  <th style="padding: 10px 8px; font-weight: 500; font-family: var(--font-display); width: 22%;">PARAMETER</th>
+                  <th style="padding: 10px 8px; font-weight: 500; font-family: var(--font-display); width: 39%;">INPUT (ORIGINAL)</th>
+                  <th style="padding: 10px 8px; font-weight: 500; font-family: var(--font-display); width: 39%; color: var(--neon-green);">OUTPUT (PROCESSED)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- 1. Cryptographic & File Signatures -->
+                <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <td colspan="3" style="padding: 10px 8px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--neon-cyan);">1. Cryptographic & File Signatures</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">SHA-256 Hash</td>
+                  <td style="padding: 12px 8px; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--color-text-muted);" id="input-hash-val">Calculating...</td>
+                  <td style="padding: 12px 8px; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--neon-green);" id="output-hash-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">SHA-1 Signature</td>
+                  <td style="padding: 12px 8px; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--color-text-muted);" id="input-sig-val">Calculating...</td>
+                  <td style="padding: 12px 8px; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--neon-green);" id="output-sig-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Asset UUID</td>
+                  <td style="padding: 12px 8px; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--color-text-muted);" id="input-uuid-val">-</td>
+                  <td style="padding: 12px 8px; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: var(--neon-green);" id="output-uuid-val">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Metadata Timestamp</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-date-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-date-val">-</td>
+                </tr>
+
+                <!-- 2. Video & Visual Fingerprinting -->
+                <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255,255,255,0.05); border-top: 1px solid rgba(255,255,255,0.05);">
+                  <td colspan="3" style="padding: 10px 8px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--neon-cyan);">2. Video & Visual Fingerprinting</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Format Container</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-format-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-format-val">video/mp4</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Muxer writing library</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-muxer-val">Unknown Creator</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-muxer-val">AuraCut Web Muxer v5.2.2</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Codec</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-vcodec-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-vcodec-val">H.264 (avc1)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Chroma Subsampling</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-chroma-val">YUV 4:2:0</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-chroma-val">YUV 4:2:0 (WebCodecs)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Playback Speed</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-speed-val">1.00x (Static)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-speed-val">1.25x Base (Dynamic Jitter)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Aspect Ratio</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-aspect-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-aspect-val">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Pixel Aspect Ratio (PAR)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-par-val">1:1 (Square Pixels)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-par-val">1:1 (Square Pixels)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Frame Count</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-framecount-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-framecount-val">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Frequency</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-fps-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-fps-val">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Bitrate</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-bitrate-val">VBR (Dynamic)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-bitrate-val">4.0 Mbps (Target)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Color Profile Matrix</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-colorspace-val">ITU-R BT.709</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-colorspace-val">ITU-R BT.709 (Shifted)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Color Space Range</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-colorrange-val">Limited Range (16-235)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-colorrange-val">Full Range (0-255) [Shifted]</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Frame Glitch Jitter</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-glitch-val">0.0000% (None)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-glitch-val">0.0020%</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Frame Timing Jitter</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-jitter-val">0.00 ms (Constant)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-jitter-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Average Hash (aHash)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-family: monospace; color: var(--color-text-muted);" id="input-ahash-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-family: monospace; color: var(--neon-green);" id="output-ahash-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Difference Hash (dHash)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-family: monospace; color: var(--color-text-muted);" id="input-dhash-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-family: monospace; color: var(--neon-green);" id="output-dhash-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Perceptual Hash (pHash)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-family: monospace; color: var(--color-text-muted);" id="input-phash-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-family: monospace; color: var(--neon-green);" id="output-phash-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Video Spatial Fingerprint</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-vfingerprint-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-vfingerprint-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Keyframe Splicing Index</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-keyframe-val">30 Uniform Keyframes</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-keyframe-val">24 Jittered Keyframes (Modified)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Scene / Shot Detection Boundaries</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-scene-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-scene-val">Pending Processing</td>
+                </tr>
+
+                <!-- 3. Audio & Acoustic Fingerprinting -->
+                <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255,255,255,0.05); border-top: 1px solid rgba(255,255,255,0.05);">
+                  <td colspan="3" style="padding: 10px 8px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--neon-cyan);">3. Audio & Acoustic Fingerprinting</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Channels</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-channels-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-channels-val">Stereo (2)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Frequency</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-audio-freq-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-audio-freq-val">-</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Bit Depth</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-bitdepth-val">32-bit Float</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-bitdepth-val">16-bit Float (AAC)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Total Samples</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-totalsamples-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-totalsamples-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Stream Bitrate</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-audio-bitrate-val">128 kbps (Approx)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-audio-bitrate-val">128 kbps (CBR)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Compression Mode</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-audiomode-val">Variable (VBR)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-audiomode-val">Constant (CBR)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Audio Spectral Fingerprint</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-afingerprint-val">-</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-afingerprint-val">Pending Processing</td>
+                </tr>
+
+                <!-- 4. Computer Vision & AI Tracking -->
+                <tr style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid rgba(255,255,255,0.05); border-top: 1px solid rgba(255,255,255,0.05);">
+                  <td colspan="3" style="padding: 10px 8px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--neon-cyan);">4. Computer Vision & AI Tracking</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Feature Matching (SIFT/ORB)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-features-val">100% Correspondence</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-features-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Object Detection (YOLO/SSD)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-object-val">Class Confidence Matrices</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-object-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Facial Recognition Mesh</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-face-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-face-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">OCR & Logo Watermark Mask</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-ocr-val">Unfiltered Channels</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-ocr-val">Noise Mask Applied</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Motion & Optical Flow Analysis</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-motion-val">Standard Vector Fields</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-motion-val">Velocity Jitter Applied</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">Reverse Video Search Index</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-reverse-val">Matched Index: 28 Hits</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-reverse-val">No Matched Index Found</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">AI CLIP Embedding Vector</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-embedding-val">Analyzing...</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-embedding-val">Pending Processing</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 12px 8px; font-size: 0.8rem; font-weight: 500; color: var(--color-text-main);">YouTube Content ID & Copyright Match</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--color-text-muted);" id="input-copyright-val">Flagged (Copyright Match ID)</td>
+                  <td style="padding: 12px 8px; font-size: 0.8rem; color: var(--neon-green);" id="output-copyright-val">Cleared (No Signatures Match)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Configurations and Stats -->
+      <section class="control-panel flex-col" style="gap: 24px;">
+        <!-- File Info & Actions (Moved to Top) -->
+        <div class="card action-card">
+          <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px;">
+            <h2><span class="icon">⚡</span> File Actions</h2>
+            <div class="badge preview-badge">Workspace</div>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <div class="file-details" id="file-details" style="display: none; margin-bottom: 16px;">
+              <div class="detail-row">
+                <span class="lbl">File Name:</span>
+                <span class="val truncate" id="file-name">video.mp4</span>
+              </div>
+              <div class="detail-row">
+                <span class="lbl">Size:</span>
+                <span class="val" id="file-size-val">0.0 MB</span>
+              </div>
+              <div class="detail-row">
+                <span class="lbl">Input Duration:</span>
+                <span class="val" id="input-duration-val">0.0s</span>
+              </div>
+              <div class="detail-row">
+                <span class="lbl">Output Duration:</span>
+                <span class="val" id="output-duration-val">0.0s</span>
+              </div>
+              <div class="detail-row">
+                <span class="lbl">Input Frames:</span>
+                <span class="val" id="input-frames-val">0 frames</span>
+              </div>
+              <div class="detail-row">
+                <span class="lbl">Output Frames:</span>
+                <span class="val" id="output-frames-val">0 frames</span>
+              </div>
+            </div>
+
+            <div class="action-buttons">
+              <button class="btn btn-primary btn-block glow-btn" id="process-btn" disabled>
+                <span class="btn-text">Remove CRF & Process</span>
+                <span class="btn-glow"></span>
+              </button>
+            </div>
+
+            <!-- Download Link Section -->
+            <div class="download-section" id="download-section" style="display: none; margin-top: 12px;">
+              <div class="success-message" style="margin-bottom: 12px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <polyline points="22 4 12 14.01 9 11.01" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                </svg>
+                Processing Complete!
+              </div>
+              <a href="#" class="btn btn-success btn-block" id="download-btn" download="processed_video.mp4">
+                Download Processed Video
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Card -->
+        <div class="card settings-card">
+          <div class="card-header">
+            <h2><span class="icon">⚙️</span> Processing Pipeline</h2>
+            <div class="badge preview-badge">Settings</div>
+          </div>
+          <div class="card-body flex-col" style="gap: 16px; padding: 20px;">
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Skip Rate (Elimination)</span>
+                <span class="val-badge">20%</span>
+              </div>
+              <div class="setting-description">Skips 1 out of every 5 frames to reduce the visual frame rate frequency from 30Hz to 24Hz.</div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Color Profiling Filter</span>
+                <span class="val-badge">0.1% Hue</span>
+              </div>
+              <div class="setting-description">Applies an microscopic, imperceptible color hue shift using high-performance hardware filters.</div>
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Jirjir Static Opacity</span>
+                <span id="static-opacity-badge" class="val-badge" style="background: rgba(139, 92, 246, 0.15); color: var(--neon-purple); border-color: rgba(139, 92, 246, 0.3);">1.5%</span>
+              </div>
+              <div class="setting-description">Adds granular visual tv static overlay to physically modify pixel grids. Use slider below to adjust density.</div>
+              <input type="range" id="static-opacity-slider" min="0" max="10" step="0.5" value="1.5" style="width: 100%; margin-top: 8px; cursor: pointer;">
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Micro-Glitch Intensity</span>
+                <span id="glitch-intensity-badge" class="val-badge" style="background: rgba(6, 182, 212, 0.15); color: var(--neon-cyan); border-color: rgba(6, 182, 212, 0.3);">0.0020%</span>
+              </div>
+              <div class="setting-description">Applies microscopic digital glitches (max 0.01%, min 0.0001% screen width) to physically displace random scanlines.</div>
+              <input type="range" id="glitch-intensity-slider" min="0.0001" max="0.0100" step="0.0001" value="0.0020" style="width: 100%; margin-top: 8px; cursor: pointer;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-time Speed Graph Card -->
+        <div class="card graph-card">
+          <div class="card-header">
+            <h2><span class="icon">📈</span> Speed Fluctuation Graph</h2>
+            <div class="badge speed-badge" id="speed-badge">1.00x</div>
+          </div>
+          <div class="card-body" style="padding: 20px;">
+            <div class="graph-container" style="height: 120px; position: relative;">
+              <canvas id="speed-graph" style="width: 100%; height: 100%; display: block;"></canvas>
+            </div>
+            <p class="setting-description" style="margin-top: 10px;">Fluctuates playhead speed continuously between 0.99x and 1.01x, making it impossible for output audio markers to match the original.</p>
+          </div>
+        </div>
+
+        <!-- Audio Waveform Analysis Card -->
+        <div class="card audio-card">
+          <div class="card-header">
+            <h2><span class="icon">🔊</span> Audio Waveform Analysis</h2>
+            <div class="badge preview-badge">Comparison</div>
+          </div>
+          <div class="card-body flex-col" style="gap: 12px; padding: 16px;">
+            <div class="waveform-group">
+              <div class="waveform-label">
+                <span>Input Waveform (Original)</span>
+                <span class="waveform-sub" id="input-wave-sub">0.00s</span>
+              </div>
+              <div class="waveform-container" style="position: relative; height: 50px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden;">
+                <canvas id="input-waveform" style="position: absolute; top:0; left:0; width: 100%; height: 100%; display: block;"></canvas>
+              </div>
+            </div>
+            <div class="waveform-group">
+              <div class="waveform-label">
+                <span>Output Waveform (Spliced & Shortened)</span>
+                <span class="waveform-sub" id="output-wave-sub" style="color: var(--neon-green);">0.00s</span>
+              </div>
+              <div class="waveform-container" style="position: relative; height: 50px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden;">
+                <canvas id="output-waveform" style="position: absolute; top:0; left:0; width: 100%; height: 100%; display: block;"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 AuraCut CRF Processing Engine. Powered by Web Audio, WebGL & Canvas.</p>
+    </footer>
+  </div>
+
+  <!-- SVG Gradients -->
+  <svg style="position: absolute; width: 0; height: 0;">
+    <defs>
+      <linearGradient id="neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#06b6d4" />
+        <stop offset="100%" stop-color="#8b5cf6" />
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <script src="mp4-muxer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
