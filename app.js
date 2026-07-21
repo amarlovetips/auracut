@@ -1435,36 +1435,34 @@ async function startProcessing() {
       };
 
       // 4. Offline Frame-by-Frame Video Rendering Loop
-      const duration = state.videoDuration;
-      const baseFps = 30; // base input video frames per second
-      const totalInputFrames = Math.floor(duration * baseFps);
+      const targetDuration = state.processedAudioBuffer ? 
+        (state.processedAudioBuffer.length / state.processedAudioBuffer.sampleRate) : 
+        state.videoDuration * 0.8;
       
-      let inputFrameIdx = 0;
+      // Calculate total output frames based on target audio duration
+      const totalOutputFrames = Math.round(targetDuration * state.fps);
+      
       let outputFrameIdx = 0;
 
       async function encodeNextFrame() {
         if (!state.isProcessing) return;
 
-        if (inputFrameIdx >= totalInputFrames) {
+        if (outputFrameIdx >= totalOutputFrames) {
           // Finished encoding all video frames!
           finalizeOfflineExport(muxer, videoEncoder, audioEncoder);
           return;
         }
 
-        // Frame Dropping Rule: Every 5th frame is removed
-        if (inputFrameIdx % 5 === 4) {
-          inputFrameIdx++;
-          // Skip drawing, immediately proceed to next frame
-          setTimeout(encodeNextFrame, 0);
-          return;
-        }
-
         // Update progress UI
-        const progressPct = Math.min(99, Math.round((inputFrameIdx / totalInputFrames) * 100));
+        const progressPct = Math.min(99, Math.round((outputFrameIdx / totalOutputFrames) * 100));
         exportProgress.textContent = `${progressPct}%`;
 
-        // Seek video to exact time
-        const seekTime = inputFrameIdx / baseFps;
+        // Frame Dropping Rule: Every 5th frame is removed
+        // In our mapping, for every 4 output frames, we step 5 input frames:
+        const mappedInputFrameIdx = Math.floor(outputFrameIdx / 4) * 5 + (outputFrameIdx % 4);
+
+        // Seek video to exact time corresponding to the mapped input frame (base input FPS is 30)
+        const seekTime = mappedInputFrameIdx / 30;
         sourceVideo.currentTime = seekTime;
 
         // Wait for seeked event
@@ -1509,7 +1507,6 @@ async function startProcessing() {
           videoEncoder.encode(videoFrame);
           videoFrame.close();
 
-          inputFrameIdx++;
           outputFrameIdx++;
 
           // Continue loop
