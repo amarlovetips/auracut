@@ -442,7 +442,23 @@
                 <span id="glitch-intensity-badge" class="val-badge" style="background: rgba(6, 182, 212, 0.15); color: var(--neon-cyan); border-color: rgba(6, 182, 212, 0.3);">0.0020%</span>
               </div>
               <div class="setting-description">Applies microscopic digital glitches (max 0.01%, min 0.0001% screen width) to physically displace random scanlines.</div>
-              <input type="range" id="glitch-intensity-slider" min="0.0001" max="0.0100" step="0.0001" value="0.0020" style="width: 100%; margin-top: 8px; cursor: pointer;">
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>Advanced Anti-Copyright Bypasses</span>
+              </div>
+              <div style="display: flex; gap: 16px; margin-top: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--color-text-main); cursor: pointer;">
+                  <input type="checkbox" id="mirror-checkbox" style="accent-color: var(--neon-cyan); width: 16px; height: 16px; cursor: pointer;">
+                  Horizontal Mirror (Flip)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--color-text-main); cursor: pointer;">
+                  <input type="checkbox" id="zoom-checkbox" style="accent-color: var(--neon-cyan); width: 16px; height: 16px; cursor: pointer;">
+                  Zoom-In Scale (1.05x Crop)
+                </label>
+              </div>
+              <div class="setting-description" style="margin-top: 6px;">Mirroring and slight scale-cropping are highly effective at completely breaking spatial computer vision algorithms (like SIFT keypoints) used by Content ID systems.</div>
             </div>
           </div>
         </div>

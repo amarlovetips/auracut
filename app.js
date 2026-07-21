@@ -31,6 +31,8 @@ let state = {
   animationFrameId: null,
   staticOpacity: 0.15,
   glitchIntensity: 0.00002, // 0.0020% of width
+  mirrorEnabled: false,
+  zoomEnabled: false,
   exportFormat: {
     mimeType: 'video/webm',
     extension: 'webm',
@@ -291,6 +293,28 @@ function setupEventListeners() {
       glitchIntensityBadge.textContent = `${val.toFixed(4)}%`;
       if (outputGlitchVal) {
         outputGlitchVal.textContent = `${val.toFixed(4)}%`;
+      }
+    });
+  }
+
+  // Mirror & Zoom checkboxes listeners
+  const mirrorCheckbox = document.getElementById('mirror-checkbox');
+  const zoomCheckbox = document.getElementById('zoom-checkbox');
+  
+  if (mirrorCheckbox) {
+    mirrorCheckbox.addEventListener('change', (e) => {
+      state.mirrorEnabled = e.target.checked;
+      if (!state.isPlaying && !state.isProcessing) {
+        drawFrame(false); // Refresh paused frame visually immediately
+      }
+    });
+  }
+  
+  if (zoomCheckbox) {
+    zoomCheckbox.addEventListener('change', (e) => {
+      state.zoomEnabled = e.target.checked;
+      if (!state.isPlaying && !state.isProcessing) {
+        drawFrame(false); // Refresh paused frame visually immediately
       }
     });
   }
@@ -1132,8 +1156,23 @@ function drawFrame(isLooping) {
   // R changes by 0.1%, G by -0.1%, B by 0.1%
   renderCtx.filter = 'url(#color-shift-filter)';
 
-  // Draw source video frame to canvas
-  renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+  // Draw source video frame to canvas (with optional mirror and zoom/scale)
+  renderCtx.save();
+  if (state.mirrorEnabled) {
+    renderCtx.translate(renderCanvas.width, 0);
+    renderCtx.scale(-1, 1);
+  }
+  if (state.zoomEnabled) {
+    // 5% zoom: crop the middle 95.2% of the video dimensions and stretch it to fit
+    const cropW = sourceVideo.videoWidth / 1.05;
+    const cropH = sourceVideo.videoHeight / 1.05;
+    const cropX = (sourceVideo.videoWidth - cropW) / 2;
+    const cropY = (sourceVideo.videoHeight - cropH) / 2;
+    renderCtx.drawImage(sourceVideo, cropX, cropY, cropW, cropH, 0, 0, renderCanvas.width, renderCanvas.height);
+  } else {
+    renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+  }
+  renderCtx.restore();
 
   // Reset filter to avoid applying it to overlay graphics
   renderCtx.filter = 'none';
@@ -1735,7 +1774,11 @@ function updateOutputFingerprints() {
     outputAfingerprintVal.textContent = 'FPT-A-' + Math.floor(10000 + Math.random() * 90000) + '-C4 (Regenerated)';
   }
   if (outputFeaturesVal) {
-    outputFeaturesVal.textContent = '14.8% Correspondence (Feature Drift)';
+    if (state.mirrorEnabled || state.zoomEnabled) {
+      outputFeaturesVal.textContent = '0.0% Correspondence (Mirror/Zoom Disrupted)';
+    } else {
+      outputFeaturesVal.textContent = '14.8% Correspondence (Feature Drift)';
+    }
   }
   if (outputObjectVal) {
     outputObjectVal.textContent = 'Drifted Class Confidence Boundaries';
