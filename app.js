@@ -1561,12 +1561,10 @@ async function startProcessing() {
         try {
           const support = await AudioEncoder.isConfigSupported(audioConfig);
           if (!support.supported) {
-            console.warn("AAC encoding is not natively supported by this browser. Falling back to Opus.");
-            finalAudioCodec = 'opus';
+            throw new Error("AAC encoding is not natively supported by this browser.");
           }
         } catch (e) {
-          console.warn("AudioEncoder.isConfigSupported failed, assuming Opus fallback:", e);
-          finalAudioCodec = 'opus';
+          throw new Error("AAC encoding check failed: " + e.message);
         }
       }
 
@@ -1575,12 +1573,12 @@ async function startProcessing() {
         target: new ArrayBufferTarget(),
         fastStart: 'in-memory',
         video: {
-          codec: 'avc1.42c01e', // H.264 Constrained Baseline Profile (Level 3.0) for universal compatibility
+          codec: 'avc', // Set to 'avc' for mp4-muxer compatibility
           width: fullWidth,
           height: fullHeight
         },
         audio: fluctuatedAudioBuffer ? {
-          codec: finalAudioCodec,
+          codec: finalAudioCodec === 'opus' ? 'opus' : 'aac', // Set to 'aac' or 'opus' for mp4-muxer compatibility
           sampleRate: fluctuatedAudioBuffer.sampleRate,
           numberOfChannels: fluctuatedAudioBuffer.numberOfChannels
         } : null,
