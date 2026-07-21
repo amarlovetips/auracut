@@ -1597,7 +1597,7 @@ async function startProcessing() {
         }
       });
       videoEncoder.configure({
-        codec: 'avc1.64002a', // H.264 High Profile (Level 4.2) for maximum hardware compatibility
+        codec: 'avc1.42c01e', // H.264 Baseline Profile (Level 3.0) for universal browser and platform compatibility
         width: fullWidth,
         height: fullHeight,
         bitrate: 4_000_000, // 4 Mbps
