@@ -1714,8 +1714,7 @@ async function startProcessing() {
         // Calculate corresponding source time using the speed timeline
         const sourceTime = getSourceTimeForPlayTime(playTimeOfFrame, speedTimeline);
 
-        // Seek video to exact time corresponding to the speed-fluctuated position
-        sourceVideo.currentTime = Math.min(sourceTime, state.videoDuration);
+        const targetTime = Math.min(sourceTime, state.videoDuration);
 
         // Wait for seeked event
         const onSeeked = async () => {
@@ -1766,7 +1765,12 @@ async function startProcessing() {
           setTimeout(encodeNextFrame, 0);
         };
 
-        sourceVideo.addEventListener('seeked', onSeeked);
+        if (Math.abs(sourceVideo.currentTime - targetTime) < 0.001) {
+          setTimeout(onSeeked, 0);
+        } else {
+          sourceVideo.addEventListener('seeked', onSeeked);
+          sourceVideo.currentTime = targetTime;
+        }
       }
 
       // Start the offline encoding loop
