@@ -4,6 +4,19 @@
 const Muxer = window.Mp4Muxer ? window.Mp4Muxer.Muxer : null;
 const ArrayBufferTarget = window.Mp4Muxer ? window.Mp4Muxer.ArrayBufferTarget : null;
 
+// Helper function to create distortion curve for subtle harmonic wave shaping (anti-copyright)
+function makeDistortionCurve(amount) {
+  const k = typeof amount === 'number' ? amount : 10;
+  const n_samples = 44100;
+  const curve = new Float32Array(n_samples);
+  const deg = Math.PI / 180;
+  for (let i = 0; i < n_samples; ++i) {
+    const x = (i * 2) / n_samples - 1;
+    curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
 // State variables
 let state = {
   file: null,
@@ -16,7 +29,9 @@ let state = {
   processedAudioBuffer: null,
   isPlaying: false,
   isProcessing: false,
-  currentSpeed: 1.0,
+  currentSpeed: 1.05,
+  speedPhase: 0,
+  audioFilterPhase: 0,
   speedHistory: [],
   maxHistoryLength: 60,
   dirtOpacity: 0.5,
@@ -26,6 +41,8 @@ let state = {
   audioSourceNode: null,
   audioDestinationNode: null,
   previewAudioSource: null,
+  previewFilterNode: null,
+  previewShaperNode: null,
   gainNode: null,
   speedTimer: null,
   animationFrameId: null,
@@ -33,6 +50,9 @@ let state = {
   glitchIntensity: 0.000002, // 0.0002% of width
   mirrorEnabled: false,
   zoomEnabled: false,
+  audioPlayhead: 0,
+  lastAudioUpdateTime: 0,
+  audioPlaybackRate: 1.0,
   exportFormat: {
     mimeType: 'video/webm',
     extension: 'webm',
@@ -513,7 +533,7 @@ async function handleFile(file) {
     outputAspectVal.textContent = `${state.videoWidth}x${state.videoHeight} (${aspectStr})`;
 
     const inputDuration = state.videoDuration;
-    const outputDuration = state.videoDuration * 0.8;
+    const outputDuration = state.videoDuration / 1.10;
     inputDurationVal.textContent = `${inputDuration.toFixed(2)}s`;
     outputDurationVal.textContent = `${outputDuration.toFixed(2)}s`;
 
@@ -525,9 +545,17 @@ async function handleFile(file) {
     inputFramecountVal.textContent = `${inputFrames} frames`;
     outputFramecountVal.textContent = `${outputFrames} frames`;
     
-    // Set rendering canvas size
-    renderCanvas.width = state.videoWidth;
-    renderCanvas.height = state.videoHeight;
+    // Set preview rendering canvas size (downscaled to max-width 640 for fluid 30fps preview)
+    const previewWidth = Math.min(state.videoWidth, 640);
+    renderCanvas.width = previewWidth - (previewWidth % 2);
+    const previewHeight = Math.round(renderCanvas.width * (state.videoHeight / state.videoWidth));
+    renderCanvas.height = previewHeight - (previewHeight % 2);
+
+    // Disable pitch preservation on the video element (removes heavy CPU time-stretching overhead, preventing lag)
+    sourceVideo.preservesPitch = false;
+    sourceVideo.webkitPreservesPitch = false;
+    sourceVideo.mozPreservesPitch = false;
+
 
     // Show Workspace elements
     uploadZone.style.display = 'none';
@@ -554,7 +582,22 @@ async function handleFile(file) {
 async function extractAudioAsync(file) {
   try {
     state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Setup anti-copyright frequency sweep nodes (peaking filter sweep + wave-shaper distortion)
+    state.previewFilterNode = state.audioContext.createBiquadFilter();
+    state.previewFilterNode.type = 'peaking';
+    state.previewFilterNode.Q.value = 1.0;
+    state.previewFilterNode.gain.value = 4.0;
+    
+    state.previewShaperNode = state.audioContext.createWaveShaper();
+    state.previewShaperNode.curve = makeDistortionCurve(10); // Subtle harmonic waves transformation
+    state.previewShaperNode.oversample = '4x';
+
     state.gainNode = state.audioContext.createGain();
+    
+    // Connect preview chain: shaper -> filter -> gainNode -> destination
+    state.previewShaperNode.connect(state.previewFilterNode);
+    state.previewFilterNode.connect(state.gainNode);
     state.gainNode.connect(state.audioContext.destination);
 
     updateStatus('Extracting Audio Track...', 'purple');
@@ -581,22 +624,20 @@ async function extractAudioAsync(file) {
       inputWaveSub.textContent = `${state.originalAudioBuffer.duration.toFixed(2)}s`;
     }
 
-    updateStatus('Processing Audio (Dropping every 5th frame equivalent)...', 'purple');
-    // Process audio (remove 1 out of 5 frames worth of audio samples)
-    const splicedBuffer = processAudioSync(state.originalAudioBuffer);
-
-    // Resample to a different frequency!
-    // If input sample rate is 44100, target is 48000. Otherwise, target is 44100.
-    const targetSampleRate = state.originalAudioBuffer.sampleRate === 44100 ? 48000 : 44100;
+    updateStatus('Processing Audio (Resampling for perfect 1.0x sync)...', 'purple');
     
-    updateStatus(`Resampling Audio to ${targetSampleRate} Hz...`, 'purple');
+    const targetSampleRate = 48000;
+    const targetDuration = state.originalAudioBuffer.duration;
+    const targetChannels = Math.min(2, state.originalAudioBuffer.numberOfChannels);
+    
     const offlineCtx = new OfflineAudioContext(
-      splicedBuffer.numberOfChannels,
-      Math.floor(splicedBuffer.duration * targetSampleRate),
+      targetChannels,
+      Math.floor(targetDuration * targetSampleRate),
       targetSampleRate
     );
     const bufferSource = offlineCtx.createBufferSource();
-    bufferSource.buffer = splicedBuffer;
+    bufferSource.buffer = state.originalAudioBuffer;
+    bufferSource.playbackRate.value = 1.0; // Normal speed
     bufferSource.connect(offlineCtx.destination);
     bufferSource.start(0);
     
@@ -844,20 +885,20 @@ function startSpeedFluctuation() {
 
   state.speedTimer = setInterval(() => {
     if (state.isPlaying || state.isProcessing) {
-      // Delta fluctuates between 0.002 and 0.005 for smooth jitter
-      const delta = 0.002 + Math.random() * 0.003;
-      const sign = Math.random() < 0.5 ? -1 : 1;
+      // Increment phase for the sinusoidal fluctuation wave (faster oscillation rate)
+      state.speedPhase = (state.speedPhase || 0) + 0.35;
       
-      // Speed fluctuates around 1.0 (clamped strictly between 0.99 and 1.01)
-      let nextSpeed = state.currentSpeed + (delta * sign);
-      nextSpeed = Math.max(0.99, Math.min(1.01, nextSpeed));
+      // Calculate speed wave strictly between 1.05 and 1.15 with organic noise
+      const noise = (Math.random() - 0.5) * 0.004;
+      let nextSpeed = 1.10 + Math.sin(state.speedPhase) * 0.05 + noise;
+      nextSpeed = Math.max(1.05, Math.min(1.15, nextSpeed));
       
       state.currentSpeed = parseFloat(nextSpeed.toFixed(3));
       speedIndicator.textContent = `${state.currentSpeed.toFixed(2)}x`;
 
-      // Update audio playback rate if playing audio (smooth transition over 300ms)
+      // Update audio playback rate if playing audio
       if (state.isPlaying && state.previewAudioSource) {
-        state.previewAudioSource.playbackRate.setTargetAtTime(state.currentSpeed, state.audioContext.currentTime, 0.3);
+        state.previewAudioSource.playbackRate.value = state.currentSpeed;
       }
       
       // Push to history for graph plotting
@@ -868,7 +909,7 @@ function startSpeedFluctuation() {
       
       drawGraph();
     }
-  }, 2500);
+  }, 500);
 }
 
 // Resize graph canvas to fit container
@@ -904,7 +945,7 @@ function drawGraph() {
   graphCtx.clearRect(0, 0, width, height);
 
   // Draw background grid lines (horizontal)
-  const speedLevels = [1.01, 1.00, 0.99];
+  const speedLevels = [1.15, 1.10, 1.05];
   graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
   graphCtx.lineWidth = 1;
   graphCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
@@ -973,8 +1014,8 @@ function drawGraph() {
 
 // Map speed value to Y position on graph canvas
 function mapSpeedToY(speed, height) {
-  const minSpeed = 0.98;
-  const maxSpeed = 1.02;
+  const minSpeed = 1.03;
+  const maxSpeed = 1.17;
   
   // Padding top & bottom
   const padding = 15;
@@ -1011,8 +1052,9 @@ function playPreview() {
     </svg>
   `;
 
-  // Start source video
+  // Start source video natively (let browser decode frames smoothly)
   sourceVideo.play();
+  sourceVideo.playbackRate = state.currentSpeed;
   
   // Setup audio node for playing processed audio
   if (state.processedAudioBuffer) {
@@ -1022,18 +1064,16 @@ function playPreview() {
     
     state.previewAudioSource = state.audioContext.createBufferSource();
     state.previewAudioSource.buffer = state.processedAudioBuffer;
-    state.previewAudioSource.connect(state.gainNode);
+    state.previewAudioSource.connect(state.previewShaperNode || state.gainNode);
     
-    // Compute starting audio time based on current video seek percentage
-    // Since video is playing at 1.25x speed (excluding fluctuations) and audio is 20% shorter:
-    // Audio matches video sync when starting at: VideoTime * 0.8
-    const startTime = sourceVideo.currentTime * 0.8;
+    // Compute starting audio time based on current video seek percentage (1:1 speed match)
+    const startTime = sourceVideo.currentTime;
+    state.audioPlayhead = startTime;
+    state.lastAudioUpdateTime = state.audioContext.currentTime;
+    state.audioPlaybackRate = state.currentSpeed;
     state.previewAudioSource.start(0, startTime);
-    state.previewAudioSource.playbackRate.setTargetAtTime(state.currentSpeed, state.audioContext.currentTime, 0.3);
+    state.previewAudioSource.playbackRate.value = state.currentSpeed;
   }
-
-  // Set initial playback speed (which fluctuates)
-  sourceVideo.playbackRate = state.currentSpeed * 1.25;
 
   // Run render loop
   runRenderLoop();
@@ -1092,7 +1132,10 @@ function seekVideo(e) {
 
   sourceVideo.currentTime = seekTime;
   timelineProgress.style.width = `${pct * 100}%`;
-  currentTimeDisplay.textContent = formatTime(seekTime * 0.8);
+  currentTimeDisplay.textContent = formatTime(seekTime);
+
+  state.audioPlayhead = seekTime;
+  state.lastAudioUpdateTime = state.audioContext.currentTime;
 
   // If playing, restart audio source at the synced position
   if (state.isPlaying) {
@@ -1106,9 +1149,9 @@ function seekVideo(e) {
     if (state.processedAudioBuffer) {
       state.previewAudioSource = state.audioContext.createBufferSource();
       state.previewAudioSource.buffer = state.processedAudioBuffer;
-      state.previewAudioSource.connect(state.gainNode);
-      state.previewAudioSource.start(0, seekTime * 0.8);
-      state.previewAudioSource.playbackRate.setTargetAtTime(state.currentSpeed, state.audioContext.currentTime, 0.3);
+      state.previewAudioSource.connect(state.previewShaperNode || state.gainNode);
+      state.previewAudioSource.start(0, seekTime);
+      state.previewAudioSource.playbackRate.value = state.currentSpeed;
     }
   }
 }
@@ -1117,18 +1160,63 @@ function seekVideo(e) {
 function runRenderLoop() {
   if (!state.isPlaying) return;
 
+  // Draw the current video frame natively from the video element
   drawFrame(true);
 
-  // Update timeline position
+  // Update timeline position based on native video element's currentTime (1:1 ratio)
   const pct = (sourceVideo.currentTime / state.videoDuration) * 100;
   timelineProgress.style.width = `${pct}%`;
-  currentTimeDisplay.textContent = formatTime(sourceVideo.currentTime * 0.8);
+  currentTimeDisplay.textContent = formatTime(sourceVideo.currentTime);
 
-  // Update video playback speed dynamically based on current speed fluctuation
-  sourceVideo.playbackRate = state.currentSpeed * 1.25;
+  // Calculate elapsed audio time based on audio context clock and speed fluctuations
+  if (state.processedAudioBuffer) {
+    const now = state.audioContext.currentTime;
+    if (state.lastAudioUpdateTime > 0) {
+      const dt = now - state.lastAudioUpdateTime;
+      state.audioPlayhead += dt * state.audioPlaybackRate;
+    }
+    state.lastAudioUpdateTime = now;
 
-  // Handle loop or end
-  if (sourceVideo.currentTime >= state.videoDuration) {
+    // Smooth BiquadFilter frequency sweep linked to speed (anti-copyright)
+    if (state.previewFilterNode) {
+      const ratio = (state.currentSpeed - 1.05) / 0.10;
+      const filterFreq = 1000 + ratio * 1500;
+      state.previewFilterNode.frequency.value = filterFreq;
+    }
+
+    // Expected video time (1:1 speed ratio)
+    const expectedVideoTime = state.audioPlayhead;
+
+    // Calculate drift between video playback element and audio clock
+    const drift = expectedVideoTime - sourceVideo.currentTime;
+
+    // Audio-Follows-Video Sync: Adjust audio playback speed to follow video decoding speed
+    let targetAudioRate = state.currentSpeed;
+    if (Math.abs(drift) > 0.03) { // 30ms threshold
+      // If video lags (drift > 0), slow down audio. If video leads (drift < 0), speed up audio.
+      targetAudioRate = Math.max(0.5, Math.min(1.5, state.currentSpeed - drift * 1.0));
+    }
+    
+    state.audioPlaybackRate = targetAudioRate;
+    if (state.previewAudioSource) {
+      state.previewAudioSource.playbackRate.value = targetAudioRate;
+    }
+
+    // Keep video element playing smoothly at base speed (no spamming!)
+    const targetVideoRate = state.currentSpeed;
+    if (Math.abs(sourceVideo.playbackRate - targetVideoRate) > 0.01) {
+      sourceVideo.playbackRate = targetVideoRate;
+    }
+  } else {
+    const targetPlaybackRate = state.currentSpeed;
+    if (Math.abs(sourceVideo.playbackRate - targetPlaybackRate) > 0.01) {
+      sourceVideo.playbackRate = targetPlaybackRate;
+    }
+  }
+
+  // Handle loop or end (check if the audio playhead has reached the resampled audio duration)
+  const targetAudioDuration = state.processedAudioBuffer ? state.processedAudioBuffer.duration : state.videoDuration;
+  if (state.audioPlayhead >= targetAudioDuration) {
     pausePreview();
     sourceVideo.currentTime = 0;
     timelineProgress.style.width = '0%';
@@ -1338,9 +1426,14 @@ async function startProcessing() {
   if (state.processedAudioBuffer) {
     state.audioSourceNode = state.audioContext.createBufferSource();
     state.audioSourceNode.buffer = state.processedAudioBuffer;
-    state.audioSourceNode.connect(state.audioDestinationNode);
-    // Connect to speakers so the user can hear/monitor it
-    state.audioSourceNode.connect(state.gainNode);
+    state.audioSourceNode.connect(state.previewShaperNode || state.gainNode);
+    
+    // Route the filtered sweeps to the recording destination
+    if (state.previewFilterNode) {
+      state.previewFilterNode.connect(state.audioDestinationNode);
+    } else {
+      state.audioSourceNode.connect(state.audioDestinationNode);
+    }
   }
 
   // Check if WebCodecs and MediaStreamTrackProcessor are supported
@@ -1353,52 +1446,178 @@ async function startProcessing() {
     // WEBCODECS + MP4-MUXER ROUTE (GENUINE MP4 OUTPUT)
     // ----------------------------------------------------
     try {
-      // 1. Initialize MP4 Muxer
+      // Resize canvas to full video dimensions for high-quality offline export
+      const fullWidth = state.videoWidth - (state.videoWidth % 2);
+      const fullHeight = state.videoHeight - (state.videoHeight % 2);
+      renderCanvas.width = fullWidth;
+      renderCanvas.height = fullHeight;
+
+      const outputFps = state.fps * 0.8;
+
+      // 1. Generate speed timeline and calculate the exact speed-fluctuated target duration
+      const speedTimeline = [];
+      const baseDuration = state.videoDuration;
+      let sourceTimeLeft = baseDuration;
+      let playTime = 0;
+      let phase = 0;
+      const blockSize = 0.5;
+      
+      while (sourceTimeLeft > 0) {
+        phase += 0.35;
+        const noise = (Math.random() - 0.5) * 0.004;
+        let speed = 1.10 + Math.sin(phase) * 0.05 + noise;
+        speed = Math.max(1.05, Math.min(1.15, speed));
+        
+        const sourceBlockSize = blockSize * speed;
+        if (sourceTimeLeft >= sourceBlockSize) {
+          speedTimeline.push({ startTime: playTime, endTime: playTime + blockSize, speed, sourceStart: baseDuration - sourceTimeLeft });
+          sourceTimeLeft -= sourceBlockSize;
+          playTime += blockSize;
+        } else {
+          speedTimeline.push({ startTime: playTime, endTime: playTime + (sourceTimeLeft / speed), speed, sourceStart: baseDuration - sourceTimeLeft });
+          playTime += sourceTimeLeft / speed;
+          sourceTimeLeft = 0;
+        }
+      }
+      const targetDuration = playTime;
+
+      // Helper function to map play time back to source time based on the speed timeline
+      function getSourceTimeForPlayTime(pTime, timeline) {
+        for (let block of timeline) {
+          if (pTime >= block.startTime && pTime <= block.endTime) {
+            return block.sourceStart + (pTime - block.startTime) * block.speed;
+          }
+        }
+        return timeline[timeline.length - 1].sourceStart + (pTime - timeline[timeline.length - 1].startTime) * timeline[timeline.length - 1].speed;
+      }
+
+      // 2. Render the speed-fluctuated audio track offline using OfflineAudioContext
+      let fluctuatedAudioBuffer = null;
+      if (state.processedAudioBuffer) {
+        const sampleRate = state.processedAudioBuffer.sampleRate;
+        const channels = state.processedAudioBuffer.numberOfChannels;
+        
+        const offlineCtx = new OfflineAudioContext(
+          channels,
+          Math.floor(targetDuration * sampleRate),
+          sampleRate
+        );
+        
+        const bufferSource = offlineCtx.createBufferSource();
+        bufferSource.buffer = state.processedAudioBuffer;
+        
+        const offlineShaper = offlineCtx.createWaveShaper();
+        offlineShaper.curve = makeDistortionCurve(10); // Subtle harmonic waves transformation
+        offlineShaper.oversample = '4x';
+
+        const offlineFilter = offlineCtx.createBiquadFilter();
+        offlineFilter.type = 'peaking';
+        offlineFilter.Q.value = 1.0;
+        offlineFilter.gain.value = 4.0;
+
+        // Schedule speed changes on the offline context timeline
+        speedTimeline.forEach(block => {
+          bufferSource.playbackRate.setValueAtTime(block.speed, block.startTime);
+        });
+
+        // Helper to query the fluctuated speed at any given play time
+        function getSpeedAtPlayTime(pTime, timeline) {
+          for (let block of timeline) {
+            if (pTime >= block.startTime && pTime <= block.endTime) {
+              return block.speed;
+            }
+          }
+          return 1.055;
+        }
+
+        // Schedule filter sweeps smoothly over the entire timeline (50ms intervals) linked to speed
+        let t = 0;
+        while (t < targetDuration) {
+          const speed = getSpeedAtPlayTime(t, speedTimeline);
+          const ratio = (speed - 1.05) / 0.10;
+          const filterFreq = 1000 + ratio * 1500;
+          offlineFilter.frequency.setValueAtTime(filterFreq, t);
+          t += 0.05;
+        }
+
+        // Connect chain: source -> shaper -> filter -> destination
+        bufferSource.connect(offlineShaper);
+        offlineShaper.connect(offlineFilter);
+        offlineFilter.connect(offlineCtx.destination);
+        bufferSource.start(0);
+        
+        fluctuatedAudioBuffer = await offlineCtx.startRendering();
+      }
+
+      // Asynchronously query codec support
+      let finalAudioCodec = 'mp4a.40.2';
+      if (fluctuatedAudioBuffer) {
+        const audioConfig = {
+          codec: 'mp4a.40.2',
+          sampleRate: fluctuatedAudioBuffer.sampleRate,
+          numberOfChannels: fluctuatedAudioBuffer.numberOfChannels,
+          bitrate: 128_000
+        };
+        try {
+          const support = await AudioEncoder.isConfigSupported(audioConfig);
+          if (!support.supported) {
+            console.warn("AAC encoding is not natively supported by this browser. Falling back to Opus.");
+            finalAudioCodec = 'opus';
+          }
+        } catch (e) {
+          console.warn("AudioEncoder.isConfigSupported failed, assuming Opus fallback:", e);
+          finalAudioCodec = 'opus';
+        }
+      }
+
+      // 3. Initialize MP4 Muxer (with fastStart: 'in-memory' for universal player compatibility)
       const muxer = new Muxer({
         target: new ArrayBufferTarget(),
+        fastStart: 'in-memory',
         video: {
           codec: 'avc1.42c01e', // H.264 Constrained Baseline Profile (Level 3.0) for universal compatibility
-          width: renderCanvas.width,
-          height: renderCanvas.height
+          width: fullWidth,
+          height: fullHeight
         },
-        audio: state.processedAudioBuffer ? {
-          codec: 'mp4a.40.2', // AAC-LC
-          sampleRate: state.processedAudioBuffer.sampleRate,
-          numberOfChannels: state.processedAudioBuffer.numberOfChannels
+        audio: fluctuatedAudioBuffer ? {
+          codec: finalAudioCodec,
+          sampleRate: fluctuatedAudioBuffer.sampleRate,
+          numberOfChannels: fluctuatedAudioBuffer.numberOfChannels
         } : null,
         firstTimestampBehavior: 'offset'
       });
 
-      // 2. Initialize VideoEncoder
+      // 4. Initialize VideoEncoder
       const videoEncoder = new VideoEncoder({
         output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
         error: (e) => console.error("VideoEncoder error:", e)
       });
       videoEncoder.configure({
         codec: 'avc1.42c01e',
-        width: renderCanvas.width,
-        height: renderCanvas.height,
+        width: fullWidth,
+        height: fullHeight,
         bitrate: 4_000_000, // 4 Mbps
-        framerate: state.fps,
+        framerate: outputFps,
+        keyframeInterval: Math.round(outputFps * 2), // Keyframe every 2 seconds for perfect seekability
         latencyMode: 'quality'
       });
 
-      // 3. Initialize AudioEncoder (if audio exists)
+      // 5. Initialize AudioEncoder (if audio exists)
       let audioEncoder = null;
-      if (state.processedAudioBuffer) {
+      if (fluctuatedAudioBuffer) {
         audioEncoder = new AudioEncoder({
           output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
           error: (e) => console.error("AudioEncoder error:", e)
         });
         audioEncoder.configure({
-          codec: 'mp4a.40.2',
-          sampleRate: state.processedAudioBuffer.sampleRate,
-          numberOfChannels: state.processedAudioBuffer.numberOfChannels,
+          codec: finalAudioCodec,
+          sampleRate: fluctuatedAudioBuffer.sampleRate,
+          numberOfChannels: fluctuatedAudioBuffer.numberOfChannels,
           bitrate: 128_000 // 128 kbps
         });
 
         // Encode all audio data offline in chunks of 1024 frames
-        const audioBuffer = state.processedAudioBuffer;
+        const audioBuffer = fluctuatedAudioBuffer;
         const sampleRate = audioBuffer.sampleRate;
         const channels = audioBuffer.numberOfChannels;
         const totalAudioFrames = audioBuffer.length;
@@ -1434,13 +1653,9 @@ async function startProcessing() {
         audioEncoder
       };
 
-      // 4. Offline Frame-by-Frame Video Rendering Loop
-      const targetDuration = state.processedAudioBuffer ? 
-        (state.processedAudioBuffer.length / state.processedAudioBuffer.sampleRate) : 
-        state.videoDuration * 0.8;
-      
-      // Calculate total output frames based on target audio duration
-      const totalOutputFrames = Math.round(targetDuration * state.fps);
+      // 4. Offline Frame-by-Frame Video Rendering Loop (using targetDuration derived from the speed timeline)
+      // Calculate total output frames based on target audio duration at the output framerate
+      const totalOutputFrames = Math.round(targetDuration * outputFps);
       
       let outputFrameIdx = 0;
 
@@ -1457,20 +1672,21 @@ async function startProcessing() {
         const progressPct = Math.min(99, Math.round((outputFrameIdx / totalOutputFrames) * 100));
         exportProgress.textContent = `${progressPct}%`;
 
-        // Frame Dropping Rule: Every 5th frame is removed
-        // In our mapping, for every 4 output frames, we step 5 input frames:
-        const mappedInputFrameIdx = Math.floor(outputFrameIdx / 4) * 5 + (outputFrameIdx % 4);
+        // Calculate the exact speed-fluctuated playback time of this frame in the output file
+        const playTimeOfFrame = outputFrameIdx / outputFps;
 
-        // Seek video to exact time corresponding to the mapped input frame (base input FPS is 30)
-        const seekTime = mappedInputFrameIdx / 30;
-        sourceVideo.currentTime = seekTime;
+        // Calculate corresponding source time using the speed timeline
+        const sourceTime = getSourceTimeForPlayTime(playTimeOfFrame, speedTimeline);
+
+        // Seek video to exact time corresponding to the speed-fluctuated position
+        sourceVideo.currentTime = Math.min(sourceTime, state.videoDuration);
 
         // Wait for seeked event
         const onSeeked = async () => {
           sourceVideo.removeEventListener('seeked', onSeeked);
 
-          // Force frame counter to bypass the drop frame check inside drawFrame
-          state.frameCounter = outputFrameIdx * 5; 
+          // Force frame counter for overlay/glitch states
+          state.frameCounter = outputFrameIdx; 
           
           // Clear canvas
           renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
@@ -1499,12 +1715,13 @@ async function startProcessing() {
           if (state.staticOpacity > 0) drawStaticOverlay();
           if (state.glitchIntensity > 0) drawGlitchOverlay();
 
-          // Create VideoFrame from canvas
-          const frameTimestampUs = Math.round(outputFrameIdx * (1000000 / state.fps));
+          // Create VideoFrame from canvas (using exact speed-fluctuated output timestamp)
+          const frameTimestampUs = Math.round(playTimeOfFrame * 1000000);
           const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
 
-          // Encode
-          videoEncoder.encode(videoFrame);
+          // Encode (forcing keyframe every 2 seconds for perfect player seekability)
+          const forceKeyframe = (outputFrameIdx % Math.round(outputFps * 2) === 0);
+          videoEncoder.encode(videoFrame, { keyFrame: forceKeyframe });
           videoFrame.close();
 
           outputFrameIdx++;
@@ -1541,7 +1758,21 @@ async function startProcessing() {
     }
     const combinedStream = new MediaStream(tracks);
 
-    state.mediaRecorder = new MediaRecorder(combinedStream, { mimeType: state.exportFormat.mimeType });
+    // Determine a supported mimeType for MediaRecorder (fallback to WebM if MP4 is unsupported)
+    let mimeType = state.exportFormat.mimeType;
+    let ext = state.exportFormat.extension;
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'video/webm;codecs=vp9,opus';
+      ext = 'webm';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm;codecs=vp8,opus';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+      }
+    }
+
+    state.mediaRecorder = new MediaRecorder(combinedStream, { mimeType });
     state.mediaRecorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) {
         state.recordedChunks.push(e.data);
@@ -1549,10 +1780,10 @@ async function startProcessing() {
     };
 
     state.mediaRecorder.onstop = () => {
-      const blob = new Blob(state.recordedChunks, { type: state.exportFormat.mimeType });
+      const blob = new Blob(state.recordedChunks, { type: mimeType });
       const downloadURL = URL.createObjectURL(blob);
       downloadBtn.href = downloadURL;
-      downloadBtn.download = `processed_video.${state.exportFormat.extension}`;
+      downloadBtn.download = `processed_video.${ext}`;
       downloadSection.style.display = 'block';
       
       // Calculate output hash, digital signature, and set UUID/Dates
@@ -1585,7 +1816,23 @@ async function startProcessing() {
       updateOutputFingerprints();
 
       combinedStream.getTracks().forEach(track => track.stop());
+      if (state.previewFilterNode && state.audioDestinationNode) {
+        try {
+          state.previewFilterNode.disconnect(state.audioDestinationNode);
+        } catch(e) {}
+      }
       state.isProcessing = false;
+
+      // Resize canvas back to preview resolution
+      const previewWidth = Math.min(state.videoWidth, 640);
+      renderCanvas.width = previewWidth - (previewWidth % 2);
+      const previewHeight = Math.round(renderCanvas.width * (state.videoHeight / state.videoWidth));
+      renderCanvas.height = previewHeight - (previewHeight % 2);
+      
+      if (!state.isPlaying) {
+        drawFrame(false); // redraw the paused frame at preview resolution
+      }
+
       processingLoader.style.display = 'none';
       updateStatus('Processing Complete', 'green');
     };
@@ -1597,12 +1844,16 @@ async function startProcessing() {
   sourceVideo.play();
   if (state.processedAudioBuffer) {
     state.audioSourceNode.start(0);
+    // Initialize playhead variables for export sync (MediaRecorder fallback)
+    state.audioPlayhead = 0;
+    state.lastAudioUpdateTime = state.audioContext.currentTime;
+    state.audioPlaybackRate = state.currentSpeed;
   }
 
-  // Video base playback speed is 1.25x (due to skipping 1 out of 5 frames)
-  sourceVideo.playbackRate = state.currentSpeed * 1.25;
+  // Video base playback speed is normal 1.0x
+  sourceVideo.playbackRate = state.currentSpeed;
   if (state.audioSourceNode) {
-    state.audioSourceNode.playbackRate.setTargetAtTime(state.currentSpeed, state.audioContext.currentTime, 0.3);
+    state.audioSourceNode.playbackRate.value = state.currentSpeed;
   }
 
   // Run the processing loop
@@ -1619,10 +1870,48 @@ function runProcessingLoop() {
   const progressPct = Math.min(100, Math.round((sourceVideo.currentTime / state.videoDuration) * 100));
   exportProgress.textContent = `${progressPct}%`;
   
-  // Keep speed fluctuations linked to video element and audio node during export
-  sourceVideo.playbackRate = state.currentSpeed * 1.25;
-  if (state.audioSourceNode) {
-    state.audioSourceNode.playbackRate.setTargetAtTime(state.currentSpeed, state.audioContext.currentTime, 0.3);
+  if (state.processedAudioBuffer) {
+    const now = state.audioContext.currentTime;
+    if (state.lastAudioUpdateTime > 0) {
+      const dt = now - state.lastAudioUpdateTime;
+      state.audioPlayhead += dt * state.audioPlaybackRate;
+    }
+    state.lastAudioUpdateTime = now;
+
+    // Smooth BiquadFilter frequency sweep linked to speed (anti-copyright)
+    if (state.previewFilterNode) {
+      const ratio = (state.currentSpeed - 1.05) / 0.10;
+      const filterFreq = 1000 + ratio * 1500;
+      state.previewFilterNode.frequency.value = filterFreq;
+    }
+
+    // Expected video time (1:1 speed ratio)
+    const expectedVideoTime = state.audioPlayhead;
+
+    // Calculate drift between video playback element and audio clock
+    const drift = expectedVideoTime - sourceVideo.currentTime;
+
+    // Audio-Follow-Video Sync: Adjust audio playback speed to follow video decoding speed
+    let targetAudioRate = state.currentSpeed;
+    if (Math.abs(drift) > 0.03) { // 30ms threshold
+      targetAudioRate = Math.max(0.5, Math.min(1.5, state.currentSpeed - drift * 1.0));
+    }
+    
+    state.audioPlaybackRate = targetAudioRate;
+    if (state.audioSourceNode) {
+      state.audioSourceNode.playbackRate.value = targetAudioRate;
+    }
+
+    // Keep video element playing smoothly at base speed (no spamming!)
+    const targetVideoRate = state.currentSpeed;
+    if (Math.abs(sourceVideo.playbackRate - targetVideoRate) > 0.01) {
+      sourceVideo.playbackRate = targetVideoRate;
+    }
+  } else {
+    const targetPlaybackRate = state.currentSpeed;
+    if (Math.abs(sourceVideo.playbackRate - targetPlaybackRate) > 0.01) {
+      sourceVideo.playbackRate = targetPlaybackRate;
+    }
   }
 
   // Check end of video processing
@@ -1630,7 +1919,7 @@ function runProcessingLoop() {
     sourceVideo.pause();
     
     if (state.activeWebCodecs) {
-      finalizeWebCodecsExport();
+      finalizeOfflineExport(state.activeWebCodecs.muxer, state.activeWebCodecs.videoEncoder, state.activeWebCodecs.audioEncoder);
     } else {
       state.mediaRecorder.stop();
       if (state.audioSourceNode) {
@@ -1707,6 +1996,16 @@ async function finalizeOfflineExport(muxer, videoEncoder, audioEncoder) {
 
   processingLoader.style.display = 'none';
   updateStatus('Processing Complete', 'green');
+
+  // Resize canvas back to preview resolution
+  const previewWidth = Math.min(state.videoWidth, 640);
+  renderCanvas.width = previewWidth - (previewWidth % 2);
+  const previewHeight = Math.round(renderCanvas.width * (state.videoHeight / state.videoWidth));
+  renderCanvas.height = previewHeight - (previewHeight % 2);
+  
+  if (!state.isPlaying) {
+    drawFrame(false); // redraw the paused frame at preview resolution
+  }
 
   state.activeWebCodecs = null;
 }
