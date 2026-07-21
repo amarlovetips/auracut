@@ -30,7 +30,7 @@ let state = {
   speedTimer: null,
   animationFrameId: null,
   staticOpacity: 0.15,
-  glitchIntensity: 0.00002, // 0.0020% of width
+  glitchIntensity: 0.000002, // 0.0002% of width
   mirrorEnabled: false,
   zoomEnabled: false,
   exportFormat: {
@@ -382,7 +382,7 @@ async function handleFile(file) {
   outputFormatVal.textContent = 'video/mp4';
 
   inputVcodecVal.textContent = 'Detecting...';
-  outputVcodecVal.textContent = 'H.264 (avc1.4d002a)';
+  outputVcodecVal.textContent = 'H.264 (avc1.42c01e)';
 
   inputChannelsVal.textContent = 'Stereo (2)';
   outputChannelsVal.textContent = 'Stereo (2)';
@@ -404,7 +404,7 @@ async function handleFile(file) {
 
   if (inputGlitchVal) inputGlitchVal.textContent = '0.0000% (None)';
   if (outputGlitchVal) {
-    const initialGlitch = glitchIntensitySlider ? parseFloat(glitchIntensitySlider.value) : 0.0020;
+    const initialGlitch = glitchIntensitySlider ? parseFloat(glitchIntensitySlider.value) : 0.0002;
     outputGlitchVal.textContent = `${initialGlitch.toFixed(4)}%`;
   }
 
@@ -1357,7 +1357,7 @@ async function startProcessing() {
       const muxer = new Muxer({
         target: new ArrayBufferTarget(),
         video: {
-          codec: 'avc1.4d002a', // H.264 Baseline Profile level 4.2
+          codec: 'avc1.42c01e', // H.264 Constrained Baseline Profile (Level 3.0) for universal compatibility
           width: renderCanvas.width,
           height: renderCanvas.height
         },
@@ -1375,11 +1375,12 @@ async function startProcessing() {
         error: (e) => console.error("VideoEncoder error:", e)
       });
       videoEncoder.configure({
-        codec: 'avc1.4d002a',
+        codec: 'avc1.42c01e',
         width: renderCanvas.width,
         height: renderCanvas.height,
         bitrate: 4_000_000, // 4 Mbps
-        framerate: state.fps
+        framerate: state.fps,
+        latencyMode: 'quality'
       });
 
       // 3. Initialize AudioEncoder (if audio exists)
@@ -1395,64 +1396,132 @@ async function startProcessing() {
           numberOfChannels: state.processedAudioBuffer.numberOfChannels,
           bitrate: 128_000 // 128 kbps
         });
-      }
 
-      // 4. Capture streams using MediaStreamTrackProcessor
-      const canvasStream = renderCanvas.captureStream(state.fps);
-      const videoTrack = canvasStream.getVideoTracks()[0];
-      const videoProcessor = new MediaStreamTrackProcessor({ track: videoTrack });
-      const videoReader = videoProcessor.readable.getReader();
-
-      let audioReader = null;
-      if (state.processedAudioBuffer) {
-        const audioTrack = state.audioDestinationNode.stream.getAudioTracks()[0];
-        const audioProcessor = new MediaStreamTrackProcessor({ track: audioTrack });
-        audioReader = audioProcessor.readable.getReader();
-      }
-
-      // 5. Start track reading and encoding loops
-      async function readVideoFrames() {
-        try {
-          while (state.isProcessing) {
-            const { done, value } = await videoReader.read();
-            if (done) break;
-            if (videoEncoder.state === 'configured') {
-              videoEncoder.encode(value);
-            }
-            value.close(); // Clean memory
+        // Encode all audio data offline in chunks of 1024 frames
+        const audioBuffer = state.processedAudioBuffer;
+        const sampleRate = audioBuffer.sampleRate;
+        const channels = audioBuffer.numberOfChannels;
+        const totalAudioFrames = audioBuffer.length;
+        const chunkSize = 1024;
+        
+        for (let offset = 0; offset < totalAudioFrames; offset += chunkSize) {
+          const currentChunkSize = Math.min(chunkSize, totalAudioFrames - offset);
+          
+          const planarBuffer = new Float32Array(channels * currentChunkSize);
+          for (let c = 0; c < channels; c++) {
+            const channelData = audioBuffer.getChannelData(c);
+            planarBuffer.set(channelData.subarray(offset, offset + currentChunkSize), c * currentChunkSize);
           }
-        } catch (e) {
-          console.error("Video track reader error:", e);
+          
+          const audioData = new AudioData({
+            format: 'f32-planar',
+            sampleRate: sampleRate,
+            numberOfFrames: currentChunkSize,
+            numberOfChannels: channels,
+            timestamp: Math.round((offset / sampleRate) * 1000000), // in microseconds
+            data: planarBuffer
+          });
+          
+          audioEncoder.encode(audioData);
+          audioData.close();
         }
       }
-      readVideoFrames();
-
-      async function readAudioData() {
-        if (!audioReader) return;
-        try {
-          while (state.isProcessing) {
-            const { done, value } = await audioReader.read();
-            if (done) break;
-            if (audioEncoder.state === 'configured') {
-              audioEncoder.encode(value);
-            }
-            value.close(); // Clean memory
-          }
-        } catch (e) {
-          console.error("Audio track reader error:", e);
-        }
-      }
-      readAudioData();
 
       // Store references in state to manage the lifecycle
       state.activeWebCodecs = {
         muxer,
         videoEncoder,
-        audioEncoder,
-        videoReader,
-        audioReader,
-        canvasStream
+        audioEncoder
       };
+
+      // 4. Offline Frame-by-Frame Video Rendering Loop
+      const duration = state.videoDuration;
+      const baseFps = 30; // base input video frames per second
+      const totalInputFrames = Math.floor(duration * baseFps);
+      
+      let inputFrameIdx = 0;
+      let outputFrameIdx = 0;
+
+      async function encodeNextFrame() {
+        if (!state.isProcessing) return;
+
+        if (inputFrameIdx >= totalInputFrames) {
+          // Finished encoding all video frames!
+          finalizeOfflineExport(muxer, videoEncoder, audioEncoder);
+          return;
+        }
+
+        // Frame Dropping Rule: Every 5th frame is removed
+        if (inputFrameIdx % 5 === 4) {
+          inputFrameIdx++;
+          // Skip drawing, immediately proceed to next frame
+          setTimeout(encodeNextFrame, 0);
+          return;
+        }
+
+        // Update progress UI
+        const progressPct = Math.min(99, Math.round((inputFrameIdx / totalInputFrames) * 100));
+        exportProgress.textContent = `${progressPct}%`;
+
+        // Seek video to exact time
+        const seekTime = inputFrameIdx / baseFps;
+        sourceVideo.currentTime = seekTime;
+
+        // Wait for seeked event
+        const onSeeked = async () => {
+          sourceVideo.removeEventListener('seeked', onSeeked);
+
+          // Force frame counter to bypass the drop frame check inside drawFrame
+          state.frameCounter = outputFrameIdx * 5; 
+          
+          // Clear canvas
+          renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
+          // Apply hue color shift
+          renderCtx.filter = 'url(#color-shift-filter)';
+          // Draw video (with optional mirroring and zoom-cropping)
+          renderCtx.save();
+          if (state.mirrorEnabled) {
+            renderCtx.translate(renderCanvas.width, 0);
+            renderCtx.scale(-1, 1);
+          }
+          if (state.zoomEnabled) {
+            const cropW = sourceVideo.videoWidth / 1.05;
+            const cropH = sourceVideo.videoHeight / 1.05;
+            const cropX = (sourceVideo.videoWidth - cropW) / 2;
+            const cropY = (sourceVideo.videoHeight - cropH) / 2;
+            renderCtx.drawImage(sourceVideo, cropX, cropY, cropW, cropH, 0, 0, renderCanvas.width, renderCanvas.height);
+          } else {
+            renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+          }
+          renderCtx.restore();
+          renderCtx.filter = 'none';
+
+          // Apply overlays
+          if (state.dirtOpacity > 0) drawDirtOverlay();
+          if (state.staticOpacity > 0) drawStaticOverlay();
+          if (state.glitchIntensity > 0) drawGlitchOverlay();
+
+          // Create VideoFrame from canvas
+          const frameTimestampUs = Math.round(outputFrameIdx * (1000000 / state.fps));
+          const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
+
+          // Encode
+          videoEncoder.encode(videoFrame);
+          videoFrame.close();
+
+          inputFrameIdx++;
+          outputFrameIdx++;
+
+          // Continue loop
+          setTimeout(encodeNextFrame, 0);
+        };
+
+        sourceVideo.addEventListener('seeked', onSeeked);
+      }
+
+      // Start the offline encoding loop
+      encodeNextFrame();
+      return; // Return early to prevent starting real-time playheads!
 
     } catch (err) {
       console.error("Failed to initialize WebCodecs export. Falling back to MediaRecorder:", err);
@@ -1579,28 +1648,10 @@ function runProcessingLoop() {
   requestAnimationFrame(runProcessingLoop);
 }
 
-// Finalize WebCodecs & Muxer MP4 File
-async function finalizeWebCodecsExport() {
-  const { muxer, videoEncoder, audioEncoder, videoReader, audioReader, canvasStream } = state.activeWebCodecs;
+// Finalize WebCodecs & Muxer MP4 File (Offline Mode)
+async function finalizeOfflineExport(muxer, videoEncoder, audioEncoder) {
   state.isProcessing = false;
-
-  // Stop reading tracks
-  if (videoReader) {
-    try { await videoReader.cancel(); } catch(e) {}
-  }
-  if (audioReader) {
-    try { await audioReader.cancel(); } catch(e) {}
-  }
-
-  // Stop canvas capture stream tracks
-  canvasStream.getTracks().forEach(track => track.stop());
-  
-  if (state.processedAudioBuffer) {
-    state.audioDestinationNode.stream.getTracks().forEach(track => track.stop());
-    try {
-      state.audioSourceNode.stop();
-    } catch(e) {}
-  }
+  exportProgress.textContent = '100%';
 
   // Flush and close encoders
   try {
@@ -1610,7 +1661,6 @@ async function finalizeWebCodecsExport() {
     }
     if (audioEncoder && audioEncoder.state === 'configured') {
       await audioEncoder.flush();
-      offlineCtx = null; // Clean up
       audioEncoder.close();
     }
   } catch (err) {
