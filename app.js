@@ -497,7 +497,14 @@ async function handleFile(file) {
 
   // Set up video error handler
   sourceVideo.onerror = (e) => {
-    console.error("Video load error:", sourceVideo.error);
+    console.error("Video element error:", sourceVideo.error);
+    if (state.isProcessing) {
+      console.warn("Video decode error occurred during rendering. Attempting to fall back to MediaRecorder...");
+      if (state.triggerFallback) {
+        state.triggerFallback();
+      }
+      return;
+    }
     alert("Browser cannot play this video format or codec. Please try an MP4 or WebM video.");
     // Reset UI
     uploadZone.style.display = 'flex';
@@ -1409,6 +1416,25 @@ async function startProcessing() {
   pausePreview();
   
   state.isProcessing = true;
+  state.triggerFallback = () => {
+    if (!state.isProcessing) return;
+    console.warn("Triggering MediaRecorder fallback...");
+    sourceVideo.currentTime = 0;
+    if (state.activeWebCodecs) {
+      try {
+        if (state.activeWebCodecs.videoEncoder) {
+          state.activeWebCodecs.videoEncoder.close();
+        }
+        if (state.activeWebCodecs.audioEncoder) {
+          state.activeWebCodecs.audioEncoder.close();
+        }
+      } catch (e) {
+        console.error("Error closing encoders during fallback:", e);
+      }
+      state.activeWebCodecs = null;
+    }
+    setupMediaRecorderFallback();
+  };
   downloadSection.style.display = 'none';
   processingLoader.style.display = 'flex';
   exportProgress.textContent = '0%';
@@ -1597,7 +1623,7 @@ async function startProcessing() {
         }
       });
       videoEncoder.configure({
-        codec: 'avc1.42c01e', // H.264 Baseline Profile (Level 3.0) for universal browser and platform compatibility
+        codec: 'avc1.42c028', // H.264 Baseline Profile (Level 4.0) for universal 1080p playback and hardware compatibility
         width: fullWidth,
         height: fullHeight,
         bitrate: 4_000_000, // 4 Mbps
