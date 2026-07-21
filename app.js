@@ -1588,10 +1588,16 @@ async function startProcessing() {
       // 4. Initialize VideoEncoder
       const videoEncoder = new VideoEncoder({
         output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
-        error: (e) => console.error("VideoEncoder error:", e)
+        error: (e) => {
+          console.error("VideoEncoder error:", e);
+          if (state.isProcessing && state.activeWebCodecs && !state.activeWebCodecs.fallbackTriggered) {
+            state.activeWebCodecs.fallbackTriggered = true;
+            setupMediaRecorderFallback();
+          }
+        }
       });
       videoEncoder.configure({
-        codec: 'avc1.42c01e',
+        codec: 'avc1.64002a', // H.264 High Profile (Level 4.2) for maximum hardware compatibility
         width: fullWidth,
         height: fullHeight,
         bitrate: 4_000_000, // 4 Mbps
@@ -1605,7 +1611,13 @@ async function startProcessing() {
       if (fluctuatedAudioBuffer) {
         audioEncoder = new AudioEncoder({
           output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
-          error: (e) => console.error("AudioEncoder error:", e)
+          error: (e) => {
+            console.error("AudioEncoder error:", e);
+            if (state.isProcessing && state.activeWebCodecs && !state.activeWebCodecs.fallbackTriggered) {
+              state.activeWebCodecs.fallbackTriggered = true;
+              setupMediaRecorderFallback();
+            }
+          }
         });
         audioEncoder.configure({
           codec: finalAudioCodec,
@@ -1749,6 +1761,9 @@ async function startProcessing() {
   // Setup standard MediaRecorder fallback
   function setupMediaRecorderFallback() {
     state.activeWebCodecs = null;
+    if (state.audioContext && state.audioContext.state === 'suspended') {
+      state.audioContext.resume();
+    }
     const canvasStream = renderCanvas.captureStream(state.fps);
     const tracks = [...canvasStream.getVideoTracks()];
     if (state.processedAudioBuffer) {
