@@ -1651,43 +1651,66 @@ async function startProcessing() {
           numberOfChannels: fluctuatedAudioBuffer.numberOfChannels,
           bitrate: 128_000 // 128 kbps
         });
-
-        // Encode all audio data offline in chunks of 1024 frames
-        const audioBuffer = fluctuatedAudioBuffer;
-        const sampleRate = audioBuffer.sampleRate;
-        const channels = audioBuffer.numberOfChannels;
-        const totalAudioFrames = audioBuffer.length;
-        const chunkSize = 1024;
-        
-        for (let offset = 0; offset < totalAudioFrames; offset += chunkSize) {
-          const currentChunkSize = Math.min(chunkSize, totalAudioFrames - offset);
-          
-          const planarBuffer = new Float32Array(channels * currentChunkSize);
-          for (let c = 0; c < channels; c++) {
-            const channelData = audioBuffer.getChannelData(c);
-            planarBuffer.set(channelData.subarray(offset, offset + currentChunkSize), c * currentChunkSize);
-          }
-          
-          const audioData = new AudioData({
-            format: 'f32-planar',
-            sampleRate: sampleRate,
-            numberOfFrames: currentChunkSize,
-            numberOfChannels: channels,
-            timestamp: Math.round((offset / sampleRate) * 1000000), // in microseconds
-            data: planarBuffer
-          });
-          
-          audioEncoder.encode(audioData);
-          audioData.close();
-        }
       }
 
-      // Store references in state to manage the lifecycle
+      // Store references in state to manage the lifecycle early
       state.activeWebCodecs = {
         muxer,
         videoEncoder,
         audioEncoder
       };
+
+      // Encode all audio data offline in chunks of 1024 frames asynchronously
+      if (fluctuatedAudioBuffer) {
+        const audioBuffer = fluctuatedAudioBuffer;
+        const sampleRate = audioBuffer.sampleRate;
+        const channels = audioBuffer.numberOfChannels;
+        const totalAudioFrames = audioBuffer.length;
+        const chunkSize = 1024;
+        let audioOffset = 0;
+
+        async function encodeAudioChunk() {
+          if (!state.isProcessing) return;
+
+          if (audioOffset >= totalAudioFrames) {
+            // Audio encoding complete, start video encoding
+            encodeNextFrame();
+            return;
+          }
+
+          // Respect queue limits to prevent memory pressure and hangs
+          if (audioEncoder.encodeQueueSize > 15) {
+            audioEncoder.addEventListener('dequeue', encodeAudioChunk, { once: true });
+            return;
+          }
+
+          const currentChunkSize = Math.min(chunkSize, totalAudioFrames - audioOffset);
+          const planarBuffer = new Float32Array(channels * currentChunkSize);
+          for (let c = 0; c < channels; c++) {
+            const channelData = audioBuffer.getChannelData(c);
+            planarBuffer.set(channelData.subarray(audioOffset, audioOffset + currentChunkSize), c * currentChunkSize);
+          }
+
+          const audioData = new AudioData({
+            format: 'f32-planar',
+            sampleRate: sampleRate,
+            numberOfFrames: currentChunkSize,
+            numberOfChannels: channels,
+            timestamp: Math.round((audioOffset / sampleRate) * 1000000), // in microseconds
+            data: planarBuffer
+          });
+
+          audioEncoder.encode(audioData);
+          audioData.close();
+
+          audioOffset += chunkSize;
+          setTimeout(encodeAudioChunk, 0);
+        }
+
+        encodeAudioChunk();
+      } else {
+        encodeNextFrame();
+      }
 
       // 4. Offline Frame-by-Frame Video Rendering Loop (using targetDuration derived from the speed timeline)
       // Calculate total output frames based on target audio duration at the output framerate
@@ -1701,6 +1724,12 @@ async function startProcessing() {
         if (outputFrameIdx >= totalOutputFrames) {
           // Finished encoding all video frames!
           finalizeOfflineExport(muxer, videoEncoder, audioEncoder);
+          return;
+        }
+
+        // Respect queue limits to prevent GPU overflow and hangs (such as the 88% hang)
+        if (videoEncoder.encodeQueueSize > 15) {
+          videoEncoder.addEventListener('dequeue', encodeNextFrame, { once: true });
           return;
         }
 
