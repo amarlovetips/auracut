@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Version Notes & Terms - AuraCut Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1.3">
+  <style>
+    .docs-container {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .back-nav {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      margin-bottom: 12px;
+    }
+    .back-nav:hover {
+      color: #fff;
+      transform: translateX(-4px);
+    }
+    .version-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: var(--glass-blur);
+      box-shadow: var(--card-shadow);
+    }
+    .version-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .version-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge-v1 {
+      background: rgba(139, 92, 246, 0.2);
+      color: var(--neon-purple);
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .feature-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    @media (min-width: 640px) {
+      .feature-list {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .feature-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .feature-item h4 {
+      color: var(--neon-cyan);
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feature-item p {
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .terms-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: var(--glass-blur);
+    }
+    .terms-section h3 {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      color: #fff;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .terms-block {
+      margin-bottom: 20px;
+    }
+    .terms-block h5 {
+      color: var(--neon-orange);
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .terms-block p {
+      color: var(--color-text-muted);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="23 7 16 12 23 17 23 7" fill="url(#neon-grad)"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="3" ry="3" fill="rgba(6, 182, 212, 0.15)"></rect>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>AuraCut</h1>
+          <span>RELEASE NOTES & TERMS</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <a href="index.html" class="back-nav" style="margin:0;">← Back to Editor</a>
+      </div>
+    </header>
+
+    <main class="docs-container">
+      <div>
+        <a href="index.html" class="back-nav">← Back to Main Editor</a>
+      </div>
+
+      <!-- Release Notes Card -->
+      <section class="version-card">
+        <div class="version-header">
+          <div class="version-title">
+            <span>🚀 Version Release Notes</span>
+            <span class="badge-v1">v1.0.0</span>
+          </div>
+          <span style="color: var(--color-text-muted); font-size: 0.85rem;">Released: July 2026</span>
+        </div>
+
+        <p style="color: var(--color-text-main); font-size: 0.95rem; margin-bottom: 20px; line-height: 1.6;">
+          Welcome to the official <strong>v1.0.0</strong> release of <strong>AuraCut CRF Video Engine</strong>. This release introduces a client-side WebCodecs processing pipeline, password-protected branding overlays, and 10 state-of-the-art Anti-Copyright bypass engines.
+        </p>
+
+        <div class="feature-list">
+          <div class="feature-item">
+            <h4>⚡ Hardware-Accelerated WebCodecs Export</h4>
+            <p>Direct MP4 (H.264 Baseline L4.0 + AAC) encoding using WebCodecs GPU hardware acceleration with queue-pressure draining to prevent crashes.</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>🛡️ TikTok 2-Corner Watermark System</h4>
+            <p>Dynamic positioning overlay: Top-Left during 1st half of video, Bottom-Right during 2nd half, with password unlock system.</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>🎬 Appended 6-Second Outro Branding</h4>
+            <p>Appends an extra 6-second animated outro card with logo scaling & website link at the end of the output video without cutting original duration.</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>🔐 SHA-256 Remote Password Verification</h4>
+            <p>Loads password or SHA-256 hash dynamically from GitHub via silent internal server proxying (<code>/api/sys-auth-key</code>).</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>📐 Micro-Tilt & Cinematic Vignette</h4>
+            <p>0.4° spatial canvas rotation and radial gradient edge masking to physically disrupt 2D SIFT/ORB computer vision scanners.</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>🎵 Audio Phase Spatializer & Pitch Wave</h4>
+            <p>Dynamic 8% stereo pan spatializing and 1.05x-1.15x speed/pitch sweeps to bypass acoustic Content ID fingerprinting.</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>🌌 Micro-Pulse Breathing Motion</h4>
+            <p>Subtle sinewave scale movement (0.985x to 1.015x) disrupting temporal frame hashing algorithms.</p>
+          </div>
+
+          <div class="feature-item">
+            <h4>✨ Dual High-Contrast Halo Glow</h4>
+            <p>Multi-pass white halo outline and drop shadow ensuring black watermarks remain 100% visible on pitch black video frames.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Terms & Conditions Section -->
+      <section class="terms-section">
+        <h3>📜 Terms & Conditions</h3>
+
+        <div class="terms-block">
+          <h5>1. Acceptance of Terms</h5>
+          <p>By accessing and using AuraCut CRF Processing Engine (v1.0.0), you agree to be bound by these terms. If you do not agree with any part of these terms, you should immediately discontinue use of the service.</p>
+        </div>
+
+        <div class="terms-block">
+          <h5>2. Intellectual Property & Watermark Protection</h5>
+          <p>The default watermark and 6-second outro branding are protected system components. Unauthorized tampering, reverse engineering, or bypassing password controls without valid authorization is strictly prohibited. Official password support is provided via Telegram at <a href="https://t.me/auracut" target="_blank" style="color: var(--neon-cyan); text-decoration: underline;">@auracut</a>.</p>
+        </div>
+
+        <div class="terms-block">
+          <h5>3. Client-Side Privacy Guarantee</h5>
+          <p>AuraCut operates entirely inside your local web browser using HTML5 Canvas, Web Audio, and WebCodecs APIs. No user video files or audio assets are uploaded to any external server during processing.</p>
+        </div>
+
+        <div class="terms-block">
+          <h5>4. Responsible Usage & Anti-Abuse</h5>
+          <p>Users are solely responsible for ensuring they possess all necessary rights and licenses for media processed using this tool. AuraCut does not endorse or encourage copyright infringement or unlawful distribution of protected media.</p>
+        </div>
+
+        <div class="terms-block">
+          <h5>5. Limitation of Liability</h5>
+          <p>AuraCut is provided "as is" without warranty of any kind. Under no circumstances shall AuraCut, EarnTap, A4Studio, or its developers be held liable for any damages resulting from the use or inability to use this software.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 AuraCut CRF Processing Engine v1.0.0. Powered by EarnTap, A4Studio & Antigravity.</p>
+    </footer>
+  </div>
+
+  <svg style="position: absolute; width: 0; height: 0;">
+    <defs>
+      <linearGradient id="neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#06b6d4" />
+        <stop offset="100%" stop-color="#8b5cf6" />
+      </linearGradient>
+    </defs>
+  </svg>
+</body>
+</html>
