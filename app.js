@@ -2370,6 +2370,32 @@ function updateOutputFingerprints() {
   }
 }
 
+// Dynamic Password Loading from GitHub Raw File
+const REMOTE_PASSWORD_URL = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/password.txt";
+
+async function fetchRemotePassword() {
+  try {
+    const response = await fetch(REMOTE_PASSWORD_URL + '?t=' + Date.now());
+    if (response.ok) {
+      const text = (await response.text()).trim();
+      if (text.length > 0) {
+        state.watermarkPassword = text;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch remote password from GitHub, using default fallback.");
+  }
+}
+fetchRemotePassword();
+
+async function hashSHA256(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Watermark Password Unlock and Toggle Event Handlers
 const watermarkPassInput = document.getElementById('watermark-pass-input');
 const watermarkPassBtn = document.getElementById('watermark-pass-btn');
@@ -2379,9 +2405,21 @@ const watermarkLockStatus = document.getElementById('watermark-lock-status');
 const watermarkStateBadge = document.getElementById('watermark-state-badge');
 
 if (watermarkPassBtn && watermarkPassInput) {
-  function verifyWatermarkPassword() {
-    const enteredPass = watermarkPassInput.value;
-    if (enteredPass === state.watermarkPassword) {
+  async function verifyWatermarkPassword() {
+    const enteredPass = watermarkPassInput.value.trim();
+    const targetPass = state.watermarkPassword;
+
+    let isMatch = false;
+
+    // Check if target is a 64-character SHA-256 Hex Hash
+    if (targetPass.length === 64 && /^[a-fA-F0-9]{64}$/.test(targetPass)) {
+      const enteredHash = await hashSHA256(enteredPass);
+      isMatch = (enteredHash.toLowerCase() === targetPass.toLowerCase());
+    } else {
+      isMatch = (enteredPass === targetPass);
+    }
+
+    if (isMatch) {
       state.watermarkUnlocked = true;
       if (watermarkToggle) watermarkToggle.disabled = false;
       if (watermarkLockStatus) {
