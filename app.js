@@ -2371,7 +2371,7 @@ function updateOutputFingerprints() {
 }
 
 // Dynamic Password Loading from GitHub Raw File
-const REMOTE_PASSWORD_URL = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/password.txt";
+const REMOTE_PASSWORD_URL = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/dddblock";
 
 async function fetchRemotePassword() {
   try {
