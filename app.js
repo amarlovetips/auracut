@@ -66,11 +66,11 @@ let state = {
 // Watermark and Outro Logo Assets
 const watermarkImg = new Image();
 watermarkImg.crossOrigin = "anonymous";
-watermarkImg.src = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/watermark.png";
+watermarkImg.src = atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL3dhdGVybWFyay5wbmc=");
 
 const logoImg = new Image();
 logoImg.crossOrigin = "anonymous";
-logoImg.src = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/logo-01.png";
+logoImg.src = atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL2xvZ28tMDEucG5n");
 
 // Offscreen Noise Canvas for TV Static (Jirjir) Effect
 let noiseCanvas = document.createElement('canvas');
@@ -2370,8 +2370,8 @@ function updateOutputFingerprints() {
   }
 }
 
-// Dynamic Password Loading from GitHub Raw File
-const REMOTE_PASSWORD_URL = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/dddblock";
+// Dynamic Password Loading from Obfuscated GitHub Raw File
+const REMOTE_PASSWORD_URL = atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL2RkZGJsb2Nr");
 
 async function fetchRemotePassword() {
   try {
@@ -2382,9 +2382,7 @@ async function fetchRemotePassword() {
         state.watermarkPassword = text;
       }
     }
-  } catch (err) {
-    console.warn("Could not fetch remote password from GitHub, using default fallback.");
-  }
+  } catch (err) {}
 }
 fetchRemotePassword();
 
