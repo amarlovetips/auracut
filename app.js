@@ -52,6 +52,8 @@ let state = {
   zoomEnabled: false,
   tiltEnabled: true,
   vignetteEnabled: true,
+  pulseEnabled: true,
+  spatializerEnabled: true,
   audioPlayhead: 0,
   lastAudioUpdateTime: 0,
   audioPlaybackRate: 1.0,
@@ -1265,8 +1267,15 @@ function drawFrame(isLooping) {
   // R changes by 0.1%, G by -0.1%, B by 0.1%
   renderCtx.filter = 'url(#color-shift-filter)';
 
-  // Draw source video frame to canvas (with optional tilt, mirror and zoom/scale)
+  // Draw source video frame to canvas (with optional tilt, pulse, mirror and zoom/scale)
   renderCtx.save();
+  if (state.pulseEnabled) {
+    // Micro-pulse breathing (subtle 0.8% sinewave scale movement to disrupt temporal pHash)
+    const pulseScale = 1.0 + Math.sin(state.frameCounter * 0.08) * 0.008;
+    renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+    renderCtx.scale(pulseScale, pulseScale);
+    renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+  }
   if (state.tiltEnabled) {
     // Micro-Tilt 0.4° rotation + 1.02x scale to disrupt 2D SIFT/ORB spatial tracking
     renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
@@ -1744,10 +1753,24 @@ async function startProcessing() {
           t += 0.05;
         }
 
-        // Connect chain: source -> shaper -> filter -> destination
+        // Connect chain: source -> shaper -> filter -> (optional panner) -> destination
         bufferSource.connect(offlineShaper);
         offlineShaper.connect(offlineFilter);
-        offlineFilter.connect(offlineCtx.destination);
+
+        if (state.spatializerEnabled && typeof offlineCtx.createStereoPanner === 'function') {
+          const panner = offlineCtx.createStereoPanner();
+          let pt = 0;
+          while (pt < baseTargetDuration) {
+            const panVal = Math.sin(pt * 0.8) * 0.08; // Subtle 8% stereo pan oscillation to break acoustic hashes
+            panner.pan.setValueAtTime(panVal, pt);
+            pt += 0.1;
+          }
+          offlineFilter.connect(panner);
+          panner.connect(offlineCtx.destination);
+        } else {
+          offlineFilter.connect(offlineCtx.destination);
+        }
+
         bufferSource.start(0);
         
         fluctuatedAudioBuffer = await offlineCtx.startRendering();
@@ -1953,6 +1976,12 @@ async function startProcessing() {
           renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
           renderCtx.filter = 'url(#color-shift-filter)';
           renderCtx.save();
+          if (state.pulseEnabled) {
+            const pulseScale = 1.0 + Math.sin(outputFrameIdx * 0.08) * 0.008;
+            renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+            renderCtx.scale(pulseScale, pulseScale);
+            renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+          }
           if (state.tiltEnabled) {
             renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
             renderCtx.rotate(0.4 * Math.PI / 180);
@@ -2417,43 +2446,17 @@ function updateOutputFingerprints() {
   }
 }
 
-// Silent Background Worker for Remote Password Loading (Hides Fetch URL from Main Console Logs)
-function fetchRemotePasswordSilently() {
+// Silent Background Worker for Remote Password Loading (Via Internal Server Proxy)
+async function fetchRemotePasswordSilently() {
   try {
-    const workerCode = `
-      self.onmessage = async function(e) {
-        try {
-          let text = "";
-          try {
-            const r1 = await fetch('/api/sys-auth-key?t=' + Date.now());
-            if (r1.ok) text = await r1.text();
-          } catch(err) {}
-
-          if (!text || text.trim().length === 0) {
-            const rawUrl = atob(e.data);
-            const r2 = await fetch(rawUrl + '?t=' + Date.now());
-            if (r2.ok) text = await r2.text();
-          }
-
-          if (text && text.trim().length > 0) {
-            self.postMessage({ success: true, password: text.trim() });
-          }
-        } catch(err) {}
-      };
-    `;
-
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const worker = new Worker(URL.createObjectURL(blob));
-
-    worker.onmessage = function(e) {
-      if (e.data && e.data.success && e.data.password) {
-        state.watermarkPassword = e.data.password;
+    const res = await fetch('/api/sys-auth-key?t=' + Date.now());
+    if (res.ok) {
+      const text = (await res.text()).trim();
+      if (text.length > 0) {
+        state.watermarkPassword = text;
       }
-      worker.terminate();
-    };
-
-    worker.postMessage("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL2RkZGJsb2Nr");
-  } catch(e) {}
+    }
+  } catch (err) {}
 }
 fetchRemotePasswordSilently();
 
@@ -2555,5 +2558,21 @@ if (vignetteCheckbox) {
   vignetteCheckbox.addEventListener('change', (e) => {
     state.vignetteEnabled = vignetteCheckbox.checked;
     if (!state.isPlaying) drawFrame(false);
+  });
+}
+
+const pulseCheckbox = document.getElementById('pulse-checkbox');
+const spatializerCheckbox = document.getElementById('spatializer-checkbox');
+
+if (pulseCheckbox) {
+  pulseCheckbox.addEventListener('change', (e) => {
+    state.pulseEnabled = pulseCheckbox.checked;
+    if (!state.isPlaying) drawFrame(false);
+  });
+}
+
+if (spatializerCheckbox) {
+  spatializerCheckbox.addEventListener('change', (e) => {
+    state.spatializerEnabled = spatializerCheckbox.checked;
   });
 }
