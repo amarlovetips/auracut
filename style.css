@@ -859,6 +859,21 @@ body {
     white-space: nowrap;
   }
 
+  .preview-panel {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .controls-panel {
+    order: 2 !important;
+  }
+
+  /* Move Identity & Frequency Fingerprint Card to the absolute bottom on Mobile */
+  #identity-card-wrapper {
+    order: 99999 !important;
+    margin-top: 16px !important;
+  }
+
   .app-footer {
     padding: 16px 8px !important;
     font-size: 0.75rem !important;
