@@ -53,12 +53,24 @@ let state = {
   audioPlayhead: 0,
   lastAudioUpdateTime: 0,
   audioPlaybackRate: 1.0,
+  watermarkEnabled: true,
+  watermarkUnlocked: false,
+  watermarkPassword: "Loveauracutbd",
   exportFormat: {
     mimeType: 'video/webm',
     extension: 'webm',
     displayName: 'WebM'
   }
 };
+
+// Watermark and Outro Logo Assets
+const watermarkImg = new Image();
+watermarkImg.crossOrigin = "anonymous";
+watermarkImg.src = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/watermark.png";
+
+const logoImg = new Image();
+logoImg.crossOrigin = "anonymous";
+logoImg.src = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/logo-01.png";
 
 // Offscreen Noise Canvas for TV Static (Jirjir) Effect
 let noiseCanvas = document.createElement('canvas');
@@ -1286,6 +1298,143 @@ function drawFrame(isLooping) {
   if (state.glitchIntensity > 0) {
     drawGlitchOverlay();
   }
+
+  // 6. Watermark & 6-Second Outro Overlay Rule
+  if (state.watermarkEnabled) {
+    const curTime = sourceVideo.currentTime;
+    const dur = state.videoDuration;
+    if (dur > 6.0 && curTime >= (dur - 6.0)) {
+      const outroTime = curTime - (dur - 6.0);
+      drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
+    } else {
+      drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curTime, dur);
+    }
+  }
+}
+
+// Draw TikTok-Style Watermark Overlay (Top-Left during 1st half, Bottom-Right during 2nd half)
+function drawWatermarkOverlay(ctx, width, height, currentTime, duration) {
+  if (!state.watermarkEnabled) return;
+  if (!watermarkImg.complete || watermarkImg.naturalWidth === 0) return;
+
+  const progressRatio = duration > 0 ? (currentTime / duration) : 0;
+  
+  let wmW = Math.min(width * 0.22, 180);
+  wmW = Math.max(wmW, 70);
+  const wmAspect = watermarkImg.naturalHeight / watermarkImg.naturalWidth || 0.4;
+  const wmH = wmW * wmAspect;
+  const margin = Math.max(12, width * 0.025);
+
+  let wmX = margin;
+  let wmY = margin;
+
+  if (progressRatio >= 0.5) {
+    wmX = width - wmW - margin;
+    wmY = height - wmH - margin;
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+  ctx.drawImage(watermarkImg, wmX, wmY, wmW, wmH);
+  ctx.restore();
+}
+
+// Draw 6-Second Animated Outro (Logo + Website Link)
+function drawOutroOverlay(ctx, width, height, outroTime) {
+  if (!state.watermarkEnabled) return;
+
+  ctx.save();
+
+  // 1. Dark Gradient Card Fade-in (first 1.0s)
+  const bgAlpha = Math.min(1.0, outroTime / 1.0);
+  ctx.globalAlpha = bgAlpha * 0.96;
+
+  const bgGrad = ctx.createRadialGradient(
+    width / 2, height / 2, Math.min(width, height) * 0.05,
+    width / 2, height / 2, Math.max(width, height) * 0.75
+  );
+  bgGrad.addColorStop(0, '#0f172a');
+  bgGrad.addColorStop(0.6, '#090d16');
+  bgGrad.addColorStop(1, '#020617');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Decorative subtle grid lines
+  ctx.strokeStyle = 'rgba(6, 182, 212, 0.12)';
+  ctx.lineWidth = 1;
+  const gridStep = Math.max(30, width / 20);
+  for (let x = 0; x < width; x += gridStep) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += gridStep) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  // 2. Animated Logo (0.6s to 6.0s)
+  if (outroTime >= 0.6 && logoImg.complete && logoImg.naturalWidth > 0) {
+    const logoProgress = Math.min(1.0, (outroTime - 0.6) / 1.2);
+    const easeScale = 0.6 + 0.4 * Math.sin(logoProgress * Math.PI / 2);
+
+    ctx.globalAlpha = logoProgress;
+
+    const logoMaxW = Math.min(width * 0.38, 250);
+    const logoAspect = logoImg.naturalHeight / logoImg.naturalWidth || 1.0;
+    const logoW = logoMaxW * easeScale;
+    const logoH = logoW * logoAspect;
+    const logoX = (width - logoW) / 2;
+    const logoY = (height - logoH) / 2 - Math.max(20, height * 0.05);
+
+    ctx.shadowColor = '#06b6d4';
+    ctx.shadowBlur = Math.round(25 * logoProgress);
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+
+    // 3. Animated Website Link Text (1.8s to 6.0s)
+    if (outroTime >= 1.8) {
+      const textProgress = Math.min(1.0, (outroTime - 1.8) / 1.0);
+      const offsetY = (1.0 - textProgress) * 16;
+
+      ctx.shadowColor = '#10b981';
+      ctx.shadowBlur = Math.round(15 * textProgress);
+
+      const subFontSize = Math.max(11, Math.round(width * 0.018));
+      ctx.font = `600 ${subFontSize}px "Inter", sans-serif`;
+      ctx.fillStyle = `rgba(148, 163, 184, ${textProgress})`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('POWERED BY', width / 2, logoY + logoH + 20 + offsetY);
+
+      const textFontSize = Math.max(16, Math.round(width * 0.035));
+      ctx.font = `800 ${textFontSize}px "Outfit", "Inter", sans-serif`;
+
+      const textY = logoY + logoH + 20 + subFontSize + 6 + offsetY;
+      const textGrad = ctx.createLinearGradient(
+        width / 2 - 120, textY,
+        width / 2 + 120, textY
+      );
+      textGrad.addColorStop(0, '#06b6d4');
+      textGrad.addColorStop(0.5, '#38bdf8');
+      textGrad.addColorStop(1, '#10b981');
+
+      ctx.fillStyle = textGrad;
+      ctx.globalAlpha = textProgress;
+      ctx.fillText('auracutbd.vercl.app', width / 2, textY);
+    }
+  }
+
+  ctx.restore();
 }
 
 // Generate and Draw Random Dirt, Scratches and Hair
@@ -1779,6 +1928,18 @@ async function startProcessing() {
           if (state.staticOpacity > 0) drawStaticOverlay();
           if (state.glitchIntensity > 0) drawGlitchOverlay();
 
+          // Watermark & 6-Second Outro Overlay Rule
+          if (state.watermarkEnabled) {
+            const curTime = targetTime;
+            const dur = state.videoDuration;
+            if (dur > 6.0 && curTime >= (dur - 6.0)) {
+              const outroTime = curTime - (dur - 6.0);
+              drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
+            } else {
+              drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curTime, dur);
+            }
+          }
+
           // Create VideoFrame from canvas (using exact speed-fluctuated output timestamp)
           const frameTimestampUs = Math.round(playTimeOfFrame * 1000000);
           const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
@@ -2207,4 +2368,66 @@ function updateOutputFingerprints() {
   if (outputEmbeddingVal) {
     outputEmbeddingVal.textContent = '[0.082, -0.321, 0.648, 0.041...] (Shifted)';
   }
+}
+
+// Watermark Password Unlock and Toggle Event Handlers
+const watermarkPassInput = document.getElementById('watermark-pass-input');
+const watermarkPassBtn = document.getElementById('watermark-pass-btn');
+const watermarkPassMsg = document.getElementById('watermark-pass-msg');
+const watermarkToggle = document.getElementById('watermark-toggle');
+const watermarkLockStatus = document.getElementById('watermark-lock-status');
+const watermarkStateBadge = document.getElementById('watermark-state-badge');
+
+if (watermarkPassBtn && watermarkPassInput) {
+  function verifyWatermarkPassword() {
+    const enteredPass = watermarkPassInput.value;
+    if (enteredPass === state.watermarkPassword) {
+      state.watermarkUnlocked = true;
+      if (watermarkToggle) watermarkToggle.disabled = false;
+      if (watermarkLockStatus) {
+        watermarkLockStatus.textContent = '🔓 Unlocked';
+        watermarkLockStatus.style.background = 'rgba(16, 185, 129, 0.15)';
+        watermarkLockStatus.style.color = 'var(--neon-green)';
+        watermarkLockStatus.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      }
+      if (watermarkPassMsg) {
+        watermarkPassMsg.style.display = 'block';
+        watermarkPassMsg.style.color = 'var(--neon-green)';
+        watermarkPassMsg.textContent = 'Correct password! Toggle unlocked.';
+      }
+    } else {
+      if (watermarkPassMsg) {
+        watermarkPassMsg.style.display = 'block';
+        watermarkPassMsg.style.color = '#f87171';
+        watermarkPassMsg.textContent = 'Incorrect password!';
+      }
+    }
+  }
+
+  watermarkPassBtn.addEventListener('click', verifyWatermarkPassword);
+  watermarkPassInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') verifyWatermarkPassword();
+  });
+}
+
+if (watermarkToggle) {
+  watermarkToggle.addEventListener('change', (e) => {
+    state.watermarkEnabled = watermarkToggle.checked;
+    if (watermarkStateBadge) {
+      if (state.watermarkEnabled) {
+        watermarkStateBadge.textContent = 'ACTIVE';
+        watermarkStateBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+        watermarkStateBadge.style.color = 'var(--neon-green)';
+        watermarkStateBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+      } else {
+        watermarkStateBadge.textContent = 'DISABLED';
+        watermarkStateBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+        watermarkStateBadge.style.color = 'var(--color-text-muted)';
+        watermarkStateBadge.style.borderColor = 'var(--border-color)';
+      }
+    }
+    if (!state.isPlaying) {
+      drawFrame(false);
+    }
+  });
 }

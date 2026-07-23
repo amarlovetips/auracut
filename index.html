@@ -461,6 +461,28 @@
               </div>
               <div class="setting-description" style="margin-top: 6px;">Mirroring and slight scale-cropping are highly effective at completely breaking spatial computer vision algorithms (like SIFT keypoints) used by Content ID systems.</div>
             </div>
+
+            <div class="setting-row" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px;">
+              <div class="setting-label">
+                <span>Watermark & Outro Protection</span>
+                <span id="watermark-lock-status" class="val-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">🔒 Locked (Default ON)</span>
+              </div>
+              <div class="setting-description">Watermark (Top-Left & Bottom-Right) and 6s Outro are active by default. Enter password to unlock the toggle button.</div>
+              
+              <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
+                <input type="password" id="watermark-pass-input" placeholder="Enter password to unlock..." style="flex: 1; padding: 8px 12px; font-size: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; color: var(--color-text-main); outline: none;">
+                <button type="button" id="watermark-pass-btn" class="btn" style="padding: 8px 14px; font-size: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--color-text-main); cursor: pointer; border-radius: 6px;">Unlock</button>
+              </div>
+              <div id="watermark-pass-msg" style="display: none; font-size: 0.75rem; margin-top: 4px;"></div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px; background: rgba(0,0,0,0.2); padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--color-text-main); cursor: pointer;">
+                  <input type="checkbox" id="watermark-toggle" checked disabled style="accent-color: var(--neon-green); width: 18px; height: 18px; cursor: pointer;">
+                  Enable Watermark & Outro Branding
+                </label>
+                <span id="watermark-state-badge" class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--neon-green); border: 1px solid rgba(16, 185, 129, 0.3);">ACTIVE</span>
+              </div>
+            </div>
           </div>
         </div>
 
