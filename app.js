@@ -1299,16 +1299,11 @@ function drawFrame(isLooping) {
     drawGlitchOverlay();
   }
 
-  // 6. Watermark & 6-Second Outro Overlay Rule
+  // 6. Watermark Overlay Rule (TikTok 2-Corner Watermark during main video)
   if (state.watermarkEnabled) {
     const curTime = sourceVideo.currentTime;
     const dur = state.videoDuration;
-    if (dur > 6.0 && curTime >= (dur - 6.0)) {
-      const outroTime = curTime - (dur - 6.0);
-      drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
-    } else {
-      drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curTime, dur);
-    }
+    drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curTime, dur);
   }
 }
 
@@ -1654,7 +1649,9 @@ async function startProcessing() {
           sourceTimeLeft = 0;
         }
       }
-      const targetDuration = playTime;
+      const baseTargetDuration = playTime;
+      const outroDuration = state.watermarkEnabled ? 6.0 : 0.0;
+      const targetDuration = baseTargetDuration + outroDuration;
 
       // Helper function to map play time back to source time based on the speed timeline
       function getSourceTimeForPlayTime(pTime, timeline) {
@@ -1674,7 +1671,7 @@ async function startProcessing() {
         
         const offlineCtx = new OfflineAudioContext(
           channels,
-          Math.floor(targetDuration * sampleRate),
+          Math.floor(baseTargetDuration * sampleRate),
           sampleRate
         );
         
@@ -1707,7 +1704,7 @@ async function startProcessing() {
 
         // Schedule filter sweeps smoothly over the entire timeline (50ms intervals) linked to speed
         let t = 0;
-        while (t < targetDuration) {
+        while (t < baseTargetDuration) {
           const speed = getSpeedAtPlayTime(t, speedTimeline);
           const ratio = (speed - 1.05) / 0.10;
           const filterFreq = 1000 + ratio * 1500;
@@ -1722,6 +1719,20 @@ async function startProcessing() {
         bufferSource.start(0);
         
         fluctuatedAudioBuffer = await offlineCtx.startRendering();
+
+        // Extend audio buffer for the extra 6.0 seconds outro
+        if (outroDuration > 0) {
+          const mainSamples = fluctuatedAudioBuffer.length;
+          const outroSamples = Math.floor(outroDuration * sampleRate);
+          const totalSamples = mainSamples + outroSamples;
+
+          const extendedCtx = new OfflineAudioContext(channels, totalSamples, sampleRate);
+          const extendedBuffer = extendedCtx.createBuffer(channels, totalSamples, sampleRate);
+          for (let c = 0; c < channels; c++) {
+            extendedBuffer.getChannelData(c).set(fluctuatedAudioBuffer.getChannelData(c), 0);
+          }
+          fluctuatedAudioBuffer = extendedBuffer;
+        }
       }
 
       // Asynchronously query codec support
@@ -1861,8 +1872,7 @@ async function startProcessing() {
         encodeNextFrame();
       }
 
-      // 4. Offline Frame-by-Frame Video Rendering Loop (using targetDuration derived from the speed timeline)
-      // Calculate total output frames based on target audio duration at the output framerate
+      // 4. Offline Frame-by-Frame Video Rendering Loop (using targetDuration derived from the speed timeline + 6s outro)
       const totalOutputFrames = Math.round(targetDuration * outputFps);
       
       let outputFrameIdx = 0;
@@ -1876,7 +1886,7 @@ async function startProcessing() {
           return;
         }
 
-        // Respect queue limits to prevent GPU overflow and hangs (such as the 88% hang)
+        // Respect queue limits to prevent GPU overflow and hangs
         if (videoEncoder.encodeQueueSize > 15) {
           videoEncoder.addEventListener('dequeue', encodeNextFrame, { once: true });
           return;
@@ -1886,26 +1896,30 @@ async function startProcessing() {
         const progressPct = Math.min(99, Math.round((outputFrameIdx / totalOutputFrames) * 100));
         exportProgress.textContent = `${progressPct}%`;
 
-        // Calculate the exact speed-fluctuated playback time of this frame in the output file
+        // Calculate playback time of this frame in output file
         const playTimeOfFrame = outputFrameIdx / outputFps;
 
-        // Calculate corresponding source time using the speed timeline
-        const sourceTime = getSourceTimeForPlayTime(playTimeOfFrame, speedTimeline);
+        let targetTime = 0;
+        let isOutroFrame = false;
+        let outroTime = 0;
 
-        const targetTime = Math.min(sourceTime, state.videoDuration);
+        if (playTimeOfFrame < baseTargetDuration) {
+          const sourceTime = getSourceTimeForPlayTime(playTimeOfFrame, speedTimeline);
+          targetTime = Math.min(sourceTime, state.videoDuration);
+        } else {
+          isOutroFrame = true;
+          targetTime = state.videoDuration;
+          outroTime = playTimeOfFrame - baseTargetDuration;
+        }
 
         // Wait for seeked event
         const onSeeked = async () => {
           sourceVideo.removeEventListener('seeked', onSeeked);
 
-          // Force frame counter for overlay/glitch states
           state.frameCounter = outputFrameIdx; 
           
-          // Clear canvas
           renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
-          // Apply hue color shift
           renderCtx.filter = 'url(#color-shift-filter)';
-          // Draw video (with optional mirroring and zoom-cropping)
           renderCtx.save();
           if (state.mirrorEnabled) {
             renderCtx.translate(renderCanvas.width, 0);
@@ -1923,35 +1937,29 @@ async function startProcessing() {
           renderCtx.restore();
           renderCtx.filter = 'none';
 
-          // Apply overlays
-          if (state.dirtOpacity > 0) drawDirtOverlay();
-          if (state.staticOpacity > 0) drawStaticOverlay();
-          if (state.glitchIntensity > 0) drawGlitchOverlay();
+          if (!isOutroFrame) {
+            // Apply main video overlays & TikTok 2-corner watermark
+            if (state.dirtOpacity > 0) drawDirtOverlay();
+            if (state.staticOpacity > 0) drawStaticOverlay();
+            if (state.glitchIntensity > 0) drawGlitchOverlay();
 
-          // Watermark & 6-Second Outro Overlay Rule
-          if (state.watermarkEnabled) {
-            const curTime = targetTime;
-            const dur = state.videoDuration;
-            if (dur > 6.0 && curTime >= (dur - 6.0)) {
-              const outroTime = curTime - (dur - 6.0);
-              drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
-            } else {
-              drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curTime, dur);
+            if (state.watermarkEnabled) {
+              drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, targetTime, state.videoDuration);
             }
+          } else {
+            // Draw Appended 6-Second Outro Screen
+            drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
           }
 
-          // Create VideoFrame from canvas (using exact speed-fluctuated output timestamp)
           const frameTimestampUs = Math.round(playTimeOfFrame * 1000000);
           const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
 
-          // Encode (forcing keyframe every 2 seconds for perfect player seekability)
           const forceKeyframe = (outputFrameIdx % Math.round(outputFps * 2) === 0);
           videoEncoder.encode(videoFrame, { keyFrame: forceKeyframe });
           videoFrame.close();
 
           outputFrameIdx++;
 
-          // Continue loop
           setTimeout(encodeNextFrame, 0);
         };
 
