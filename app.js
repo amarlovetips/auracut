@@ -1355,18 +1355,27 @@ function drawWatermarkOverlay(ctx, width, height, currentTime, duration) {
 
   const progressRatio = duration > 0 ? (currentTime / duration) : 0;
   
-  let wmW = Math.min(width * 0.22, 180);
+  const aspect = width / height;
+  const isLandscape = aspect > 1.2;
+
+  // Watermark Sizing & Aspect-Aware Scale
+  let wmW = isLandscape ? Math.min(width * 0.16, 200) : Math.min(width * 0.22, 180);
   wmW = Math.max(wmW, 70);
   const wmAspect = watermarkImg.naturalHeight / watermarkImg.naturalWidth || 0.4;
   const wmH = wmW * wmAspect;
-  const margin = Math.max(12, width * 0.025);
 
-  let wmX = margin;
-  let wmY = margin;
+  // Aspect-Aware Margins (Brings 1st pos lower down, 2nd pos higher up for 16:9)
+  const marginX = isLandscape ? Math.max(20, width * 0.035) : Math.max(12, width * 0.04);
+  const marginY = isLandscape ? Math.max(24, height * 0.08) : Math.max(14, height * 0.04);
 
+  // Position 1 (Top-Left during first 50%) - Brought down lower from top edge
+  let wmX = marginX;
+  let wmY = marginY;
+
+  // Position 2 (Bottom-Right during second 50%) - Moved UP higher from bottom edge
   if (progressRatio >= 0.5) {
-    wmX = width - wmW - margin;
-    wmY = height - wmH - margin;
+    wmX = width - wmW - marginX;
+    wmY = height - wmH - marginY;
   }
 
   ctx.save();
