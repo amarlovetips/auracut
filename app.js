@@ -2240,7 +2240,7 @@ async function startProcessing() {
       const blob = new Blob(state.recordedChunks, { type: mimeType });
       const downloadURL = URL.createObjectURL(blob);
       downloadBtn.href = downloadURL;
-      downloadBtn.download = `processed_video.${ext}`;
+      downloadBtn.download = getExportFileName(ext);
       downloadSection.style.display = 'block';
       
       // Calculate output hash, digital signature, and set UUID/Dates
@@ -2418,8 +2418,19 @@ async function finalizeOfflineExport(muxer, videoEncoder, audioEncoder) {
   const blob = new Blob([buffer], { type: 'video/mp4' });
   const downloadURL = URL.createObjectURL(blob);
 
+// Generate output filename with 'final_' prefixed to original file name
+function getExportFileName(ext = 'mp4') {
+  if (state.file && state.file.name) {
+    const originalFullName = state.file.name;
+    const lastDotIdx = originalFullName.lastIndexOf('.');
+    const baseName = lastDotIdx > 0 ? originalFullName.substring(0, lastDotIdx) : originalFullName;
+    return `final_${baseName}.${ext}`;
+  }
+  return `final_processed_video.${ext}`;
+}
+
   downloadBtn.href = downloadURL;
-  downloadBtn.download = 'processed_video.mp4';
+  downloadBtn.download = getExportFileName('mp4');
   downloadSection.style.display = 'block';
 
   // Calculate output hash, digital signature, and set UUID/Dates
