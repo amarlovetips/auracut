@@ -795,3 +795,93 @@ body {
 .identity-table tr:last-child td {
   border-bottom: none;
 }
+
+/* Mobile & Tablet Ultra-Responsive Styles (Touch-Friendly Optimization) */
+@media (max-width: 1024px) {
+  .editor-layout {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 12px !important;
+    gap: 16px !important;
+  }
+
+  .app-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 14px !important;
+  }
+
+  .status-indicator {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .status-indicator a {
+    margin-right: 8px !important;
+    font-size: 0.75rem !important;
+  }
+
+  .editor-layout {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .card {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .btn {
+    padding: 14px 20px !important;
+    font-size: 0.9rem !important;
+    min-height: 48px !important;
+  }
+
+  .upload-zone {
+    padding: 24px 16px !important;
+  }
+
+  .video-workspace {
+    margin: 8px 0 !important;
+  }
+
+  .identity-table th, .identity-table td {
+    padding: 8px 10px !important;
+    font-size: 0.75rem !important;
+    white-space: nowrap;
+  }
+
+  .app-footer {
+    padding: 16px 8px !important;
+    font-size: 0.75rem !important;
+    text-align: center !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-text h1 {
+    font-size: 1.3rem !important;
+  }
+
+  .logo-text span {
+    font-size: 0.65rem !important;
+  }
+
+  .card-header h2 {
+    font-size: 1rem !important;
+  }
+
+  .setting-label {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 4px !important;
+  }
+}

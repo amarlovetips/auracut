@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms & Conditions - AuraCut Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1.4">
+  <style>
+    .docs-container {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .back-nav {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      margin-bottom: 12px;
+    }
+    .back-nav:hover {
+      color: #fff;
+      transform: translateX(-4px);
+    }
+    .terms-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: var(--glass-blur);
+      box-shadow: var(--card-shadow);
+    }
+    .terms-card h2 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 14px;
+    }
+    .terms-block {
+      margin-bottom: 22px;
+    }
+    .terms-block h4 {
+      color: var(--neon-cyan);
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .terms-block p {
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .terms-block ul {
+      color: var(--color-text-main);
+      font-size: 0.88rem;
+      line-height: 1.7;
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+    @media (max-width: 640px) {
+      .terms-card {
+        padding: 18px;
+      }
+      .terms-card h2 {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="23 7 16 12 23 17 23 7" fill="url(#neon-grad)"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="3" ry="3" fill="rgba(6, 182, 212, 0.15)"></rect>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>AuraCut</h1>
+          <span>TERMS & CONDITIONS</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <a href="index.html" class="back-nav" style="margin:0;">← Back to Editor</a>
+      </div>
+    </header>
+
+    <main class="docs-container">
+      <div>
+        <a href="index.html" class="back-nav">← Back to Main Editor</a>
+      </div>
+
+      <section class="terms-card">
+        <h2>📜 Terms & Conditions of Service</h2>
+
+        <div class="terms-block">
+          <h4>1. Agreement and Acceptance</h4>
+          <p>By accessing or using AuraCut CRF Processing Engine (v1.0.0), you agree to comply with and be bound by these Terms and Conditions. If you do not agree to these terms, please do not access or use this software.</p>
+        </div>
+
+        <div class="terms-block">
+          <h4>2. Personal Non-Commercial Use License</h4>
+          <p>AuraCut is provided under a strict <strong>Personal, Educational, and Research Non-Commercial License</strong>. You are granted a limited, non-exclusive, revocable right to use AuraCut solely for personal or educational media testing.</p>
+          <ul>
+            <li>Commercial use, corporate monetization, commercial reselling, or public sub-licensing is strictly prohibited.</li>
+            <li>Processed outputs cannot be marketed or monetized for commercial enterprise gain.</li>
+          </ul>
+        </div>
+
+        <div class="terms-block">
+          <h4>3. Intellectual Property & System Watermarks</h4>
+          <p>The default watermark graphics and 6-second appended outro branding are protected system components of AuraCut. Bypassing or attempting to reverse-engineer security access controls without valid authorization is prohibited. Official support is available via Telegram at <a href="https://t.me/auracut" target="_blank" style="color: var(--neon-cyan); text-decoration: underline;">@auracut</a>.</p>
+        </div>
+
+        <div class="terms-block">
+          <h4>4. Local Processing & Privacy Guarantee</h4>
+          <p>AuraCut processes all media entirely within your local browser environment using HTML5 Canvas, Web Audio, and WebCodecs APIs. No video or audio content is ever uploaded, stored, or transmitted to external servers.</p>
+        </div>
+
+        <div class="terms-block">
+          <h4>5. Copyright and Content Responsibility</h4>
+          <p>Users are solely responsible for ensuring they hold all necessary permissions, licenses, and rights for any video or audio files imported into AuraCut. AuraCut does not promote, condone, or encourage copyright infringement or unlawful distribution of media.</p>
+        </div>
+
+        <div class="terms-block">
+          <h4>6. Disclaimer of Warranties & Limitation of Liability</h4>
+          <p>AuraCut is provided "as is" and "as available" without warranties of any kind. Developers, EarnTap, A4Studio, and affiliated partners shall not be held liable for any claims, losses, or damages arising out of the use of this engine.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 AuraCut CRF Processing Engine v1.0.0. Powered by EarnTap, A4Studio & Antigravity. | <a href="guide.html" style="color: var(--neon-cyan); text-decoration: underline;">User Guide</a> | <a href="changelog.html" style="color: var(--neon-cyan); text-decoration: underline;">Release Notes</a> | <a href="terms.html" style="color: var(--neon-cyan); text-decoration: underline;">Terms & Conditions</a></p>
+    </footer>
+  </div>
+
+  <svg style="position: absolute; width: 0; height: 0;">
+    <defs>
+      <linearGradient id="neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#06b6d4" />
+        <stop offset="100%" stop-color="#8b5cf6" />
+      </linearGradient>
+    </defs>
+  </svg>
+</body>
+</html>
