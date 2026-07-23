@@ -38,6 +38,7 @@
         </div>
       </div>
       <div class="status-indicator">
+        <a href="guide.html" style="color: var(--neon-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; margin-right: 14px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1.0'">📖 User Guide</a>
         <a href="changelog.html" style="color: var(--neon-cyan); text-decoration: none; font-size: 0.8rem; font-weight: 600; margin-right: 12px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1.0'">📜 Release Notes & Terms</a>
         <span class="pulse-dot"></span>
         <span class="status-text">Engine Ready</span>
@@ -482,18 +483,18 @@
             <div class="setting-row" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px;">
               <div class="setting-label">
                 <span>Watermark & Outro Protection</span>
-                <span id="watermark-lock-status" class="val-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">🔒 Locked (Default ON)</span>
+                <span id="watermark-lock-status" class="val-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">🔒 Access Locked (Default ON)</span>
               </div>
               <div class="setting-description">
-                Watermark (Top-Left & Bottom-Right) and 6s Outro are active by default. Enter password to unlock the toggle button.
+                Watermark (Top-Left & Bottom-Right) and 6s Outro are active by default. Enter Access License Key to unlock the toggle button.
                 <div style="margin-top: 6px; color: var(--neon-cyan); font-weight: 500; font-size: 0.78rem;">
-                  💬 Contact for Password: <a href="https://t.me/auracut" target="_blank" rel="noopener" style="color: var(--neon-cyan); text-decoration: underline; font-weight: 700;">Telegram @auracut</a>
+                  💬 Contact for Access Key: <a href="https://t.me/auracut" target="_blank" rel="noopener" style="color: var(--neon-cyan); text-decoration: underline; font-weight: 700;">Telegram @auracut</a>
                 </div>
               </div>
               
               <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center;">
-                <input type="password" id="watermark-pass-input" placeholder="Enter password to unlock..." style="flex: 1; padding: 8px 12px; font-size: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; color: var(--color-text-main); outline: none;">
-                <button type="button" id="watermark-pass-btn" class="btn" style="padding: 8px 14px; font-size: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--color-text-main); cursor: pointer; border-radius: 6px;">Unlock</button>
+                <input type="password" id="watermark-pass-input" placeholder="Enter Access License Key..." style="flex: 1; padding: 8px 12px; font-size: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; color: var(--color-text-main); outline: none;">
+                <button type="button" id="watermark-pass-btn" class="btn" style="padding: 8px 14px; font-size: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--color-text-main); cursor: pointer; border-radius: 6px;">Verify Key</button>
               </div>
               <div id="watermark-pass-msg" style="display: none; font-size: 0.75rem; margin-top: 4px;"></div>
 
@@ -554,7 +555,7 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>&copy; 2026 AuraCut CRF Processing Engine v1.0.0. Powered by EarnTap, A4Studio & Antigravity. | <a href="changelog.html" style="color: var(--neon-cyan); text-decoration: underline;">Release Notes & Terms</a></p>
+      <p>&copy; 2026 AuraCut CRF Processing Engine v1.0.0. Powered by EarnTap, A4Studio & Antigravity. | <a href="guide.html" style="color: var(--neon-cyan); text-decoration: underline;">User Guide</a> | <a href="changelog.html" style="color: var(--neon-cyan); text-decoration: underline;">Release Notes & Terms</a></p>
     </footer>
   </div>
 

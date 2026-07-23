@@ -2515,13 +2515,13 @@ if (watermarkPassBtn && watermarkPassInput) {
       if (watermarkPassMsg) {
         watermarkPassMsg.style.display = 'block';
         watermarkPassMsg.style.color = 'var(--neon-green)';
-        watermarkPassMsg.textContent = 'Correct password! Toggle unlocked.';
+        watermarkPassMsg.textContent = 'Access License Key Verified! Toggle unlocked.';
       }
     } else {
       if (watermarkPassMsg) {
         watermarkPassMsg.style.display = 'block';
         watermarkPassMsg.style.color = '#f87171';
-        watermarkPassMsg.innerHTML = 'Incorrect password! Contact Telegram <a href="https://t.me/auracut" target="_blank" style="color: var(--neon-cyan); text-decoration: underline;">@auracut</a>';
+        watermarkPassMsg.innerHTML = 'Invalid Access Key! Contact Telegram <a href="https://t.me/auracut" target="_blank" style="color: var(--neon-cyan); text-decoration: underline;">@auracut</a>';
       }
     }
   }

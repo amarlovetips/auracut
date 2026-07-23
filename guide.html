@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Guide & Commercial Disclaimer - AuraCut Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1.3">
+  <style>
+    .guide-container {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .back-nav {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      margin-bottom: 12px;
+    }
+    .back-nav:hover {
+      color: #fff;
+      transform: translateX(-4px);
+    }
+    .guide-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: var(--glass-blur);
+      box-shadow: var(--card-shadow);
+    }
+    .guide-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      color: #fff;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+    .step-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      background: var(--neon-gradient);
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .step-content h4 {
+      color: var(--neon-cyan);
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .step-content p {
+      color: var(--color-text-muted);
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    .disclaimer-card {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 16px;
+      padding: 26px;
+    }
+    .disclaimer-card h3 {
+      color: var(--neon-red);
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .disclaimer-card p {
+      color: #fca5a5;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="23 7 16 12 23 17 23 7" fill="url(#neon-grad)"></polygon>
+            <rect x="1" y="5" width="15" height="14" rx="3" ry="3" fill="rgba(6, 182, 212, 0.15)"></rect>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>AuraCut</h1>
+          <span>USER GUIDE & DISCLAIMER</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <a href="index.html" class="back-nav" style="margin:0;">← Back to Editor</a>
+      </div>
+    </header>
+
+    <main class="guide-container">
+      <div>
+        <a href="index.html" class="back-nav">← Back to Main Editor</a>
+      </div>
+
+      <!-- How to Use Step-by-Step Guide -->
+      <section class="guide-card">
+        <h3>📖 Step-by-Step User Guide (ব্যবহারের নিয়মাবলী)</h3>
+        
+        <div class="step-box">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>Upload Video File (ভিডিও নির্বাচন বা ড্রাগ-এন্ড-ড্রপ)</h4>
+            <p>Drag and drop your video file into the designated upload area or click to select a video from your device. Supported formats include MP4, WebM, MOV, and AVI.</p>
+          </div>
+        </div>
+
+        <div class="step-box">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>Configure Filters & Protection Settings (ফিল্টার ও সিকিউরিটি সেটআপ)</h4>
+            <p>Customize the Anti-Copyright bypass filters (Micro-Tilt, Cinematic Vignette, Micro-Pulse Motion, Audio Phase Spatializer). Watermark and 6s Outro are active by default. Enter an Access License Key if you hold authorized credentials to unlock the toggle controls.</p>
+          </div>
+        </div>
+
+        <div class="step-box">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>Start Hardware Processing & Export MP4 (রেন্ডারিং শুরু করুন)</h4>
+            <p>Click the <strong>Start Processing & Export MP4</strong> button. AuraCut will render frames locally in real-time using GPU hardware acceleration. Monitor rendering progress in percentage.</p>
+          </div>
+        </div>
+
+        <div class="step-box">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h4>Download Output Video (ফাইল ডাউনলোড করুন)</h4>
+            <p>Once rendering reaches 100%, the browser will automatically initiate the download of your processed MP4 video file.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Technical Architecture Overview -->
+      <section class="guide-card">
+        <h3>🛠️ How AuraCut Engine Works (টেকনোলজি ওভারভিউ)</h3>
+        <p style="color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 16px;">
+          AuraCut is a client-side video processing system operating inside the browser. It combines HTML5 Canvas 2D rendering, Web Audio graph synthesis, and WebCodecs H.264 MP4 hardware encoding to alter video and audio signatures without uploading media to external servers.
+        </p>
+        <ul style="color: var(--color-text-main); font-size: 0.88rem; line-height: 1.8; padding-left: 20px;">
+          <li><strong>100% Browser Local Processing:</strong> All video decoding and encoding happens on your local GPU/CPU.</li>
+          <li><strong>10 Anti-Copyright Bypass Engines:</strong> Includes Micro-Tilt (0.4° Angle), Cinematic Vignette, Micro-Pulse Breathing, Audio Phase Spatialization, 24 FPS Frame Skipping, and TV Static/Dirt particles.</li>
+          <li><strong>Stealth Asset Protection:</strong> All system assets and verification keys are routed via internal server proxies to ensure stealth execution.</li>
+        </ul>
+      </section>
+
+      <!-- Non-Commercial Disclaimer Section -->
+      <section class="disclaimer-card">
+        <h3>⚠️ Non-Commercial Usage Disclaimer (কমার্শিয়াল ব্যবহারের জন্য নয়)</h3>
+        <p style="margin-bottom: 12px;">
+          <strong>IMPORTANT NOTICE:</strong> AuraCut Video Processing Engine is developed solely for <strong>Personal, Educational, Research, and Experimental Non-Commercial Use</strong>.
+        </p>
+        <p style="margin-bottom: 12px;">
+          ❌ <strong>Commercial Support Prohibition:</strong> This software does NOT support commercial use, corporate monetization, commercial reselling, or unauthorized redistribution.
+        </p>
+        <p>
+          Users are strictly responsible for verifying that their use complies with local copyright regulations and copyright holders' permissions. AuraCut, EarnTap, A4Studio, and its developers assume no liability for misuse or unauthorized commercial activities.
+        </p>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 AuraCut CRF Processing Engine v1.0.0. Powered by EarnTap, A4Studio & Antigravity. | <a href="guide.html" style="color: var(--neon-cyan); text-decoration: underline;">User Guide</a> | <a href="changelog.html" style="color: var(--neon-cyan); text-decoration: underline;">Release Notes & Terms</a></p>
+    </footer>
+  </div>
+
+  <svg style="position: absolute; width: 0; height: 0;">
+    <defs>
+      <linearGradient id="neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#06b6d4" />
+        <stop offset="100%" stop-color="#8b5cf6" />
+      </linearGradient>
+    </defs>
+  </svg>
+</body>
+</html>
