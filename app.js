@@ -2417,21 +2417,45 @@ function updateOutputFingerprints() {
   }
 }
 
-// Dynamic Password Loading from Obfuscated GitHub Raw File
-const REMOTE_PASSWORD_URL = atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL2RkZGJsb2Nr");
-
-async function fetchRemotePassword() {
+// Silent Background Worker for Remote Password Loading (Hides Fetch URL from Main Console Logs)
+function fetchRemotePasswordSilently() {
   try {
-    const response = await fetch(REMOTE_PASSWORD_URL + '?t=' + Date.now());
-    if (response.ok) {
-      const text = (await response.text()).trim();
-      if (text.length > 0) {
-        state.watermarkPassword = text;
+    const workerCode = `
+      self.onmessage = async function(e) {
+        try {
+          let text = "";
+          try {
+            const r1 = await fetch('/api/sys-auth-key?t=' + Date.now());
+            if (r1.ok) text = await r1.text();
+          } catch(err) {}
+
+          if (!text || text.trim().length === 0) {
+            const rawUrl = atob(e.data);
+            const r2 = await fetch(rawUrl + '?t=' + Date.now());
+            if (r2.ok) text = await r2.text();
+          }
+
+          if (text && text.trim().length > 0) {
+            self.postMessage({ success: true, password: text.trim() });
+          }
+        } catch(err) {}
+      };
+    `;
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+
+    worker.onmessage = function(e) {
+      if (e.data && e.data.success && e.data.password) {
+        state.watermarkPassword = e.data.password;
       }
-    }
-  } catch (err) {}
+      worker.terminate();
+    };
+
+    worker.postMessage("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL2RkZGJsb2Nr");
+  } catch(e) {}
 }
-fetchRemotePassword();
+fetchRemotePasswordSilently();
 
 async function hashSHA256(str) {
   const encoder = new TextEncoder();

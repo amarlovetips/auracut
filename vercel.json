@@ -1,5 +1,11 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/sys-auth-key",
+      "destination": "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/dddblock"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
