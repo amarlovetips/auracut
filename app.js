@@ -50,6 +50,8 @@ let state = {
   glitchIntensity: 0.000002, // 0.0002% of width
   mirrorEnabled: false,
   zoomEnabled: false,
+  tiltEnabled: true,
+  vignetteEnabled: true,
   audioPlayhead: 0,
   lastAudioUpdateTime: 0,
   audioPlaybackRate: 1.0,
@@ -1263,8 +1265,15 @@ function drawFrame(isLooping) {
   // R changes by 0.1%, G by -0.1%, B by 0.1%
   renderCtx.filter = 'url(#color-shift-filter)';
 
-  // Draw source video frame to canvas (with optional mirror and zoom/scale)
+  // Draw source video frame to canvas (with optional tilt, mirror and zoom/scale)
   renderCtx.save();
+  if (state.tiltEnabled) {
+    // Micro-Tilt 0.4° rotation + 1.02x scale to disrupt 2D SIFT/ORB spatial tracking
+    renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+    renderCtx.rotate(0.4 * Math.PI / 180);
+    renderCtx.scale(1.02, 1.02);
+    renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+  }
   if (state.mirrorEnabled) {
     renderCtx.translate(renderCanvas.width, 0);
     renderCtx.scale(-1, 1);
@@ -1299,12 +1308,35 @@ function drawFrame(isLooping) {
     drawGlitchOverlay();
   }
 
-  // 6. Watermark Overlay Rule (TikTok 2-Corner Watermark during main video)
+  // 6. Cinematic Vignette Mask (Edge shading to disrupt perceptual hashes)
+  if (state.vignetteEnabled) {
+    drawVignetteOverlay();
+  }
+
+  // 7. Watermark Overlay Rule (TikTok 2-Corner Watermark during main video)
   if (state.watermarkEnabled) {
     const curTime = sourceVideo.currentTime;
     const dur = state.videoDuration;
     drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curTime, dur);
   }
+}
+
+// Draw Subtle Cinematic Vignette Overlay (Edge Masking)
+function drawVignetteOverlay() {
+  const w = renderCanvas.width;
+  const h = renderCanvas.height;
+
+  renderCtx.save();
+  const grad = renderCtx.createRadialGradient(
+    w / 2, h / 2, Math.min(w, h) * 0.35,
+    w / 2, h / 2, Math.max(w, h) * 0.75
+  );
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0.32)');
+
+  renderCtx.fillStyle = grad;
+  renderCtx.fillRect(0, 0, w, h);
+  renderCtx.restore();
 }
 
 // Draw TikTok-Style Watermark Overlay (Top-Left during 1st half, Bottom-Right during 2nd half)
@@ -1921,6 +1953,12 @@ async function startProcessing() {
           renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
           renderCtx.filter = 'url(#color-shift-filter)';
           renderCtx.save();
+          if (state.tiltEnabled) {
+            renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+            renderCtx.rotate(0.4 * Math.PI / 180);
+            renderCtx.scale(1.02, 1.02);
+            renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+          }
           if (state.mirrorEnabled) {
             renderCtx.translate(renderCanvas.width, 0);
             renderCtx.scale(-1, 1);
@@ -1942,6 +1980,7 @@ async function startProcessing() {
             if (state.dirtOpacity > 0) drawDirtOverlay();
             if (state.staticOpacity > 0) drawStaticOverlay();
             if (state.glitchIntensity > 0) drawGlitchOverlay();
+            if (state.vignetteEnabled) drawVignetteOverlay();
 
             if (state.watermarkEnabled) {
               drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, targetTime, state.videoDuration);
@@ -2474,5 +2513,23 @@ if (watermarkToggle) {
     if (!state.isPlaying) {
       drawFrame(false);
     }
+  });
+}
+
+// Micro-Tilt and Cinematic Vignette Checkbox Listeners
+const tiltCheckbox = document.getElementById('tilt-checkbox');
+const vignetteCheckbox = document.getElementById('vignette-checkbox');
+
+if (tiltCheckbox) {
+  tiltCheckbox.addEventListener('change', (e) => {
+    state.tiltEnabled = tiltCheckbox.checked;
+    if (!state.isPlaying) drawFrame(false);
+  });
+}
+
+if (vignetteCheckbox) {
+  vignetteCheckbox.addEventListener('change', (e) => {
+    state.vignetteEnabled = vignetteCheckbox.checked;
+    if (!state.isPlaying) drawFrame(false);
   });
 }

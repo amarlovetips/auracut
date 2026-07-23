@@ -449,7 +449,7 @@
               <div class="setting-label">
                 <span>Advanced Anti-Copyright Bypasses</span>
               </div>
-              <div style="display: flex; gap: 16px; margin-top: 8px;">
+              <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px;">
                 <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--color-text-main); cursor: pointer;">
                   <input type="checkbox" id="mirror-checkbox" style="accent-color: var(--neon-cyan); width: 16px; height: 16px; cursor: pointer;">
                   Horizontal Mirror (Flip)
@@ -458,8 +458,16 @@
                   <input type="checkbox" id="zoom-checkbox" style="accent-color: var(--neon-cyan); width: 16px; height: 16px; cursor: pointer;">
                   Zoom-In Scale (1.05x Crop)
                 </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--color-text-main); cursor: pointer;">
+                  <input type="checkbox" id="tilt-checkbox" checked style="accent-color: var(--neon-cyan); width: 16px; height: 16px; cursor: pointer;">
+                  Micro-Tilt (0.4° Angle)
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--color-text-main); cursor: pointer;">
+                  <input type="checkbox" id="vignette-checkbox" checked style="accent-color: var(--neon-cyan); width: 16px; height: 16px; cursor: pointer;">
+                  Cinematic Vignette (Edge Mask)
+                </label>
               </div>
-              <div class="setting-description" style="margin-top: 6px;">Mirroring and slight scale-cropping are highly effective at completely breaking spatial computer vision algorithms (like SIFT keypoints) used by Content ID systems.</div>
+              <div class="setting-description" style="margin-top: 6px;">Mirroring, Zoom-cropping, Micro-tilting (0.4°), and Vignette edge masking physically disrupt spatial computer vision (SIFT/ORB) & perceptual hash (aHash/pHash) scanners.</div>
             </div>
 
             <div class="setting-row" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px;">
