@@ -42,6 +42,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Asset Proxy Routes (hides GitHub image URLs completely from DevTools Network & Console)
+  if (reqUrl === '/api/watermark.png') {
+    const wmUrl = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/watermark.png";
+    https.get(wmUrl, (remoteRes) => {
+      res.writeHead(remoteRes.statusCode, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      remoteRes.pipe(res);
+    }).on('error', () => { res.writeHead(404); res.end(); });
+    return;
+  }
+
+  if (reqUrl === '/api/logo-01.png') {
+    const logoUrl = "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/logo-01.png";
+    https.get(logoUrl, (remoteRes) => {
+      res.writeHead(remoteRes.statusCode, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      remoteRes.pipe(res);
+    }).on('error', () => { res.writeHead(404); res.end(); });
+    return;
+  }
+
   // Static File Serving
   let filePath = path.join(PUBLIC_DIR, reqUrl === '/' ? 'index.html' : reqUrl);
   

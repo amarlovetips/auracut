@@ -67,14 +67,14 @@ let state = {
   }
 };
 
-// Watermark and Outro Logo Assets
+// Watermark and Outro Logo Assets (Via Internal Server Proxy to hide raw GitHub URLs)
 const watermarkImg = new Image();
 watermarkImg.crossOrigin = "anonymous";
-watermarkImg.src = atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL3dhdGVybWFyay5wbmc=");
+watermarkImg.src = "/api/watermark.png";
 
 const logoImg = new Image();
 logoImg.crossOrigin = "anonymous";
-logoImg.src = atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2FtYXJsb3ZldGlwcy9pbXByb3RlbnQvcmVmcy9oZWFkcy9tYWluL2xvZ28tMDEucG5n");
+logoImg.src = "/api/logo-01.png";
 
 // Offscreen Noise Canvas for TV Static (Jirjir) Effect
 let noiseCanvas = document.createElement('canvas');
@@ -1370,12 +1370,23 @@ function drawWatermarkOverlay(ctx, width, height, currentTime, duration) {
   }
 
   ctx.save();
-  ctx.globalAlpha = 0.85;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 2;
+  ctx.globalAlpha = 0.95;
+
+  // 1. First Pass: Crisp White Outer Halo Glow (Makes black watermark 100% visible on dark/black video backgrounds)
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.95)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
   ctx.drawImage(watermarkImg, wmX, wmY, wmW, wmH);
+  ctx.drawImage(watermarkImg, wmX, wmY, wmW, wmH);
+
+  // 2. Second Pass: Soft Dark Drop Shadow (Provides contrast on bright/white video backgrounds)
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
+  ctx.drawImage(watermarkImg, wmX, wmY, wmW, wmH);
+
   ctx.restore();
 }
 

@@ -4,6 +4,14 @@
     {
       "source": "/api/sys-auth-key",
       "destination": "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/dddblock"
+    },
+    {
+      "source": "/api/watermark.png",
+      "destination": "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/watermark.png"
+    },
+    {
+      "source": "/api/logo-01.png",
+      "destination": "https://raw.githubusercontent.com/amarlovetips/improtent/refs/heads/main/logo-01.png"
     }
   ],
   "headers": [
