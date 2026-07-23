@@ -2399,7 +2399,7 @@ if (watermarkPassBtn && watermarkPassInput) {
       if (watermarkPassMsg) {
         watermarkPassMsg.style.display = 'block';
         watermarkPassMsg.style.color = '#f87171';
-        watermarkPassMsg.textContent = 'Incorrect password!';
+        watermarkPassMsg.innerHTML = 'Incorrect password! Contact Telegram <a href="https://t.me/auracut" target="_blank" style="color: var(--neon-cyan); text-decoration: underline;">@auracut</a>';
       }
     }
   }
