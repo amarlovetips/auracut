@@ -54,6 +54,7 @@ let state = {
   vignetteEnabled: true,
   pulseEnabled: true,
   spatializerEnabled: true,
+  speedFluctuationEnabled: true,
   audioPlayhead: 0,
   lastAudioUpdateTime: 0,
   audioPlaybackRate: 1.0,
@@ -351,6 +352,30 @@ function setupEventListeners() {
       state.zoomEnabled = e.target.checked;
       if (!state.isPlaying && !state.isProcessing) {
         drawFrame(false); // Refresh paused frame visually immediately
+      }
+    });
+  }
+
+  const speedFluctCheckbox = document.getElementById('speed-fluct-checkbox');
+  if (speedFluctCheckbox) {
+    speedFluctCheckbox.addEventListener('change', (e) => {
+      state.speedFluctuationEnabled = e.target.checked;
+      if (!state.speedFluctuationEnabled) {
+        state.currentSpeed = 1.0;
+        sourceVideo.playbackRate = 1.0;
+        if (state.previewAudioSource) {
+          state.previewAudioSource.playbackRate.value = 1.0;
+        }
+        const speedBadge = document.getElementById('speed-badge');
+        if (speedBadge) speedBadge.textContent = '1.00x (OFF)';
+        speedIndicator.textContent = '1.00x (OFF)';
+
+        state.speedHistory = new Array(state.maxHistoryLength).fill(1.0);
+        drawGraph();
+      } else {
+        const speedBadge = document.getElementById('speed-badge');
+        if (speedBadge) speedBadge.textContent = '1.05x';
+        speedIndicator.textContent = `${state.currentSpeed.toFixed(2)}x`;
       }
     });
   }
@@ -908,20 +933,32 @@ function startSpeedFluctuation() {
 
   state.speedTimer = setInterval(() => {
     if (state.isPlaying || state.isProcessing) {
-      // Increment phase for the sinusoidal fluctuation wave (faster oscillation rate)
-      state.speedPhase = (state.speedPhase || 0) + 0.35;
+      if (state.speedFluctuationEnabled) {
+        // Increment phase for the sinusoidal fluctuation wave
+        state.speedPhase = (state.speedPhase || 0) + 0.35;
+        
+        // Calculate speed wave strictly between 1.05 and 1.15 with organic noise
+        const noise = (Math.random() - 0.5) * 0.004;
+        let nextSpeed = 1.10 + Math.sin(state.speedPhase) * 0.05 + noise;
+        nextSpeed = Math.max(1.05, Math.min(1.15, nextSpeed));
+        
+        state.currentSpeed = parseFloat(nextSpeed.toFixed(3));
+      } else {
+        state.currentSpeed = 1.0;
+      }
       
-      // Calculate speed wave strictly between 1.05 and 1.15 with organic noise
-      const noise = (Math.random() - 0.5) * 0.004;
-      let nextSpeed = 1.10 + Math.sin(state.speedPhase) * 0.05 + noise;
-      nextSpeed = Math.max(1.05, Math.min(1.15, nextSpeed));
-      
-      state.currentSpeed = parseFloat(nextSpeed.toFixed(3));
-      speedIndicator.textContent = `${state.currentSpeed.toFixed(2)}x`;
+      const speedBadge = document.getElementById('speed-badge');
+      if (speedBadge) {
+        speedBadge.textContent = state.speedFluctuationEnabled ? `${state.currentSpeed.toFixed(2)}x` : '1.00x (OFF)';
+      }
+      speedIndicator.textContent = state.speedFluctuationEnabled ? `${state.currentSpeed.toFixed(2)}x` : '1.00x (OFF)';
 
-      // Update audio playback rate if playing audio
-      if (state.isPlaying && state.previewAudioSource) {
-        state.previewAudioSource.playbackRate.value = state.currentSpeed;
+      // Update audio & video playback rate if playing
+      if (state.isPlaying) {
+        sourceVideo.playbackRate = state.currentSpeed;
+        if (state.previewAudioSource) {
+          state.previewAudioSource.playbackRate.value = state.currentSpeed;
+        }
       }
       
       // Push to history for graph plotting
@@ -946,7 +983,7 @@ function resizeGraphCanvas() {
     inputWaveformCanvas.width = wRect.width;
     inputWaveformCanvas.height = wRect.height;
     if (state.originalAudioBuffer) {
-      drawAudioWaveform(state.originalAudioBuffer, inputWaveformCanvas, '#a855f7'); // Neon Purple
+      drawAudioWaveform(state.originalAudioBuffer, inputWaveformCanvas, '#a855f7');
     }
   }
 
@@ -955,7 +992,7 @@ function resizeGraphCanvas() {
     outputWaveformCanvas.width = wRect.width;
     outputWaveformCanvas.height = wRect.height;
     if (state.processedAudioBuffer) {
-      drawAudioWaveform(state.processedAudioBuffer, outputWaveformCanvas, '#10b981'); // Neon Green
+      drawAudioWaveform(state.processedAudioBuffer, outputWaveformCanvas, '#10b981');
     }
   }
 }
@@ -968,31 +1005,25 @@ function drawGraph() {
   graphCtx.clearRect(0, 0, width, height);
 
   // Draw background grid lines (horizontal)
-  const speedLevels = [1.15, 1.10, 1.05];
+  const speedLevels = [1.15, 1.10, 1.05, 1.00];
   graphCtx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
   graphCtx.lineWidth = 1;
   graphCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
   graphCtx.font = '10px Space Grotesk';
 
   speedLevels.forEach((level) => {
-    // Map speed level to canvas Y
-    // Speed range: 0.98 to 1.02
     const y = mapSpeedToY(level, height);
     
-    // Line
     graphCtx.beginPath();
     graphCtx.moveTo(0, y);
     graphCtx.lineTo(width, y);
     graphCtx.stroke();
     
-    // Label
     graphCtx.fillText(`${level.toFixed(2)}x`, 8, y - 4);
   });
 
-  // If no history yet, stop
   if (state.speedHistory.length === 0) return;
 
-  // Plot line
   graphCtx.beginPath();
   const step = width / (state.maxHistoryLength - 1);
   
@@ -1003,7 +1034,6 @@ function drawGraph() {
     if (i === 0) {
       graphCtx.moveTo(x, y);
     } else {
-      // Smooth curves (bezier control points)
       const prevX = (i - 1) * step;
       const prevY = mapSpeedToY(state.speedHistory[i - 1], height);
       const cpX1 = prevX + step / 2;
@@ -1014,21 +1044,19 @@ function drawGraph() {
     }
   }
 
-  // Draw Stroke with glowing neon styling
-  graphCtx.strokeStyle = '#06b6d4';
+  graphCtx.strokeStyle = state.speedFluctuationEnabled ? '#06b6d4' : '#64748b';
   graphCtx.lineWidth = 2.5;
-  graphCtx.shadowBlur = 10;
+  graphCtx.shadowBlur = state.speedFluctuationEnabled ? 10 : 0;
   graphCtx.shadowColor = 'rgba(6, 182, 212, 0.5)';
   graphCtx.stroke();
-  graphCtx.shadowBlur = 0; // Reset shadow
+  graphCtx.shadowBlur = 0;
 
-  // Fill gradient area below the line
   graphCtx.lineTo(width, height);
   graphCtx.lineTo(0, height);
   graphCtx.closePath();
 
   const gradient = graphCtx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, 'rgba(6, 182, 212, 0.15)');
+  gradient.addColorStop(0, state.speedFluctuationEnabled ? 'rgba(6, 182, 212, 0.15)' : 'rgba(100, 116, 139, 0.05)');
   gradient.addColorStop(1, 'rgba(139, 92, 246, 0.01)');
   
   graphCtx.fillStyle = gradient;
@@ -1037,14 +1065,13 @@ function drawGraph() {
 
 // Map speed value to Y position on graph canvas
 function mapSpeedToY(speed, height) {
-  const minSpeed = 1.03;
+  const minSpeed = 0.98;
   const maxSpeed = 1.17;
   
-  // Padding top & bottom
   const padding = 15;
   const activeHeight = height - (padding * 2);
   
-  const pct = (speed - minSpeed) / (maxSpeed - minSpeed);
+  const pct = Math.max(0, Math.min(1, (speed - minSpeed) / (maxSpeed - minSpeed)));
   return height - padding - (pct * activeHeight);
 }
 
@@ -1487,9 +1514,126 @@ function drawOutroOverlay(ctx, width, height, outroTime) {
       ctx.fillStyle = textGrad;
       ctx.globalAlpha = textProgress;
       ctx.fillText('auracutbd.vercl.app', width / 2, textY);
+
+      // 4. Social Media Badges (YouTube, Facebook, TikTok) - @auracutbd
+      const socialProgress = Math.min(1.0, Math.max(0, (outroTime - 2.2) / 1.0));
+      if (socialProgress > 0) {
+        ctx.save();
+        ctx.globalAlpha = socialProgress;
+
+        const iconSize = Math.max(16, Math.round(width * 0.026));
+        const gap = Math.max(10, Math.round(width * 0.016));
+        const socialFontSize = Math.max(13, Math.round(width * 0.024));
+
+        ctx.font = `700 ${socialFontSize}px "Outfit", "Inter", sans-serif`;
+        const handleText = '@auracutbd';
+        const handleWidth = ctx.measureText(handleText).width;
+
+        const totalSocialW = (iconSize * 1.3) + (iconSize * 2) + (gap * 3) + handleWidth;
+        const socialY = textY + textFontSize + 20;
+        let startX = (width - totalSocialW) / 2;
+
+        // 1. YouTube Logo
+        drawYouTubeIcon(ctx, startX, socialY, iconSize);
+        startX += (iconSize * 1.3) + gap;
+
+        // 2. Facebook Logo
+        drawFacebookIcon(ctx, startX, socialY, iconSize);
+        startX += iconSize + gap;
+
+        // 3. TikTok Logo
+        drawTikTokIcon(ctx, startX, socialY, iconSize);
+        startX += iconSize + gap + 4;
+
+        // 4. Handle "@auracutbd"
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = Math.round(10 * socialProgress);
+        ctx.fillText(handleText, startX, socialY + (iconSize - socialFontSize) / 2);
+
+        ctx.restore();
+      }
     }
   }
 
+  ctx.restore();
+}
+
+// Vector Icon Drawing Helpers for Outro Social Badges
+function drawYouTubeIcon(ctx, x, y, size) {
+  ctx.save();
+  ctx.fillStyle = '#FF0000';
+  const rw = size * 1.3;
+  const rh = size * 0.95;
+  const radius = size * 0.22;
+
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, rw, rh, radius);
+  } else {
+    ctx.rect(x, y, rw, rh);
+  }
+  ctx.fill();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.moveTo(x + rw * 0.38, y + rh * 0.25);
+  ctx.lineTo(x + rw * 0.72, y + rh * 0.5);
+  ctx.lineTo(x + rw * 0.38, y + rh * 0.75);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFacebookIcon(ctx, x, y, size) {
+  ctx.save();
+  ctx.fillStyle = '#1877F2';
+  const rw = size * 0.95;
+  const rh = size * 0.95;
+  const radius = size * 0.22;
+
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, rw, rh, radius);
+  } else {
+    ctx.rect(x, y, rw, rh);
+  }
+  ctx.fill();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = `900 ${Math.round(size * 0.75)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('f', x + rw * 0.55, y + rh * 0.55);
+  ctx.restore();
+}
+
+function drawTikTokIcon(ctx, x, y, size) {
+  ctx.save();
+  ctx.fillStyle = '#010101';
+  const rw = size * 0.95;
+  const rh = size * 0.95;
+  const radius = size * 0.22;
+
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, rw, rh, radius);
+  } else {
+    ctx.rect(x, y, rw, rh);
+  }
+  ctx.fill();
+
+  ctx.font = `900 ${Math.round(size * 0.65)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.fillStyle = '#00F2FE';
+  ctx.fillText('♪', x + rw * 0.45, y + rh * 0.48);
+
+  ctx.fillStyle = '#FE2C55';
+  ctx.fillText('♪', x + rw * 0.55, y + rh * 0.52);
   ctx.restore();
 }
 
@@ -1645,7 +1789,9 @@ async function startProcessing() {
   exportProgress.textContent = '0%';
   updateStatus('Converting Video...', 'cyan');
 
-  // Reset video time to 0
+  // Reset video time to 0 and mute element for 8x-12x Turbo GPU decoding speed
+  state.originalMuted = sourceVideo.muted;
+  sourceVideo.muted = true;
   sourceVideo.currentTime = 0;
 
   // Prepare recorded chunks
@@ -1694,10 +1840,13 @@ async function startProcessing() {
       const blockSize = 0.5;
       
       while (sourceTimeLeft > 0) {
-        phase += 0.35;
-        const noise = (Math.random() - 0.5) * 0.004;
-        let speed = 1.10 + Math.sin(phase) * 0.05 + noise;
-        speed = Math.max(1.05, Math.min(1.15, speed));
+        let speed = 1.0;
+        if (state.speedFluctuationEnabled) {
+          phase += 0.35;
+          const noise = (Math.random() - 0.5) * 0.004;
+          speed = 1.10 + Math.sin(phase) * 0.05 + noise;
+          speed = Math.max(1.05, Math.min(1.15, speed));
+        }
         
         const sourceBlockSize = blockSize * speed;
         if (sourceTimeLeft >= sourceBlockSize) {
@@ -2082,7 +2231,7 @@ async function startProcessing() {
           finalizeOfflineExport(muxer, videoEncoder, audioEncoder);
         }
 
-        sourceVideo.playbackRate = 4.0; // 4x High-Speed GPU Decoding
+        sourceVideo.playbackRate = 8.0; // 8x Turbo GPU Hardware Decoding (Renders 3x-8x faster than video duration!)
         sourceVideo.play().then(() => {
           sourceVideo.requestVideoFrameCallback(processFastStreamFrame);
         }).catch(() => {
@@ -2474,6 +2623,10 @@ function getExportFileName(ext = 'mp4') {
   if (!state.isPlaying) {
     drawFrame(false); // redraw the paused frame at preview resolution
   }
+
+  // Restore video element muted state and reset playbackRate
+  sourceVideo.muted = typeof state.originalMuted !== 'undefined' ? state.originalMuted : false;
+  sourceVideo.playbackRate = 1.0;
 
   state.activeWebCodecs = null;
 }
