@@ -1947,31 +1947,165 @@ async function startProcessing() {
         encodeNextFrame();
       }
 
-      // 4. Offline Frame-by-Frame Video Rendering Loop (using targetDuration derived from the speed timeline + 6s outro)
+      // 4. Offline Frame-by-Frame Video Rendering Loop (Ultra-Fast Hardware Stream Encoding)
       const totalOutputFrames = Math.round(targetDuration * outputFps);
-      
       let outputFrameIdx = 0;
 
-      async function encodeNextFrame() {
+      // Primary High-Speed Stream Engine (CapCut/Canva Style - 5x to 10x Speedup)
+      if (typeof sourceVideo.requestVideoFrameCallback === 'function') {
+        sourceVideo.pause();
+        sourceVideo.currentTime = 0;
+        let lastEncodedSourceTime = -1;
+        let isFinalizingOutro = false;
+
+        async function processFastStreamFrame(now, metadata) {
+          if (!state.isProcessing || isFinalizingOutro) return;
+
+          const curSourceTime = metadata.mediaTime;
+
+          if (curSourceTime > lastEncodedSourceTime + 0.005 || outputFrameIdx === 0) {
+            lastEncodedSourceTime = curSourceTime;
+            const playTimeOfFrame = outputFrameIdx / outputFps;
+
+            if (playTimeOfFrame < baseTargetDuration) {
+              state.frameCounter = outputFrameIdx;
+
+              renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
+              renderCtx.filter = 'url(#color-shift-filter)';
+              renderCtx.save();
+              if (state.pulseEnabled) {
+                const pulseScale = 1.0 + Math.sin(outputFrameIdx * 0.08) * 0.008;
+                renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+                renderCtx.scale(pulseScale, pulseScale);
+                renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+              }
+              if (state.tiltEnabled) {
+                renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+                renderCtx.rotate(0.4 * Math.PI / 180);
+                renderCtx.scale(1.02, 1.02);
+                renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+              }
+              if (state.mirrorEnabled) {
+                renderCtx.translate(renderCanvas.width, 0);
+                renderCtx.scale(-1, 1);
+              }
+              if (state.zoomEnabled) {
+                const cropW = sourceVideo.videoWidth / 1.05;
+                const cropH = sourceVideo.videoHeight / 1.05;
+                const cropX = (sourceVideo.videoWidth - cropW) / 2;
+                const cropY = (sourceVideo.videoHeight - cropH) / 2;
+                renderCtx.drawImage(sourceVideo, cropX, cropY, cropW, cropH, 0, 0, renderCanvas.width, renderCanvas.height);
+              } else {
+                renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+              }
+              renderCtx.restore();
+              renderCtx.filter = 'none';
+
+              if (state.dirtOpacity > 0) drawDirtOverlay();
+              if (state.staticOpacity > 0) drawStaticOverlay();
+              if (state.glitchIntensity > 0) drawGlitchOverlay();
+              if (state.vignetteEnabled) drawVignetteOverlay();
+
+              if (state.watermarkEnabled) {
+                drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, curSourceTime, state.videoDuration);
+              }
+
+              const frameTimestampUs = Math.round(playTimeOfFrame * 1000000);
+              const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
+              const forceKeyframe = (outputFrameIdx % Math.round(outputFps * 2) === 0);
+              videoEncoder.encode(videoFrame, { keyFrame: forceKeyframe });
+              videoFrame.close();
+
+              outputFrameIdx++;
+              exportProgress.textContent = `${Math.min(95, Math.round((outputFrameIdx / totalOutputFrames) * 100))}%`;
+            }
+          }
+
+          if (curSourceTime >= state.videoDuration - 0.05 || (outputFrameIdx / outputFps) >= baseTargetDuration) {
+            isFinalizingOutro = true;
+            sourceVideo.pause();
+            await encodeOutroAndFinalize();
+            return;
+          }
+
+          sourceVideo.requestVideoFrameCallback(processFastStreamFrame);
+        }
+
+        async function encodeOutroAndFinalize() {
+          while (outputFrameIdx < totalOutputFrames && state.isProcessing) {
+            const playTimeOfFrame = outputFrameIdx / outputFps;
+            const outroTime = playTimeOfFrame - baseTargetDuration;
+
+            renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
+            renderCtx.filter = 'url(#color-shift-filter)';
+            renderCtx.save();
+            if (state.pulseEnabled) {
+              const pulseScale = 1.0 + Math.sin(outputFrameIdx * 0.08) * 0.008;
+              renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+              renderCtx.scale(pulseScale, pulseScale);
+              renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+            }
+            if (state.tiltEnabled) {
+              renderCtx.translate(renderCanvas.width / 2, renderCanvas.height / 2);
+              renderCtx.rotate(0.4 * Math.PI / 180);
+              renderCtx.scale(1.02, 1.02);
+              renderCtx.translate(-renderCanvas.width / 2, -renderCanvas.height / 2);
+            }
+            if (state.mirrorEnabled) {
+              renderCtx.translate(renderCanvas.width, 0);
+              renderCtx.scale(-1, 1);
+            }
+            if (state.zoomEnabled) {
+              const cropW = sourceVideo.videoWidth / 1.05;
+              const cropH = sourceVideo.videoHeight / 1.05;
+              const cropX = (sourceVideo.videoWidth - cropW) / 2;
+              const cropY = (sourceVideo.videoHeight - cropH) / 2;
+              renderCtx.drawImage(sourceVideo, cropX, cropY, cropW, cropH, 0, 0, renderCanvas.width, renderCanvas.height);
+            } else {
+              renderCtx.drawImage(sourceVideo, 0, 0, renderCanvas.width, renderCanvas.height);
+            }
+            renderCtx.restore();
+            renderCtx.filter = 'none';
+
+            drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
+
+            const frameTimestampUs = Math.round(playTimeOfFrame * 1000000);
+            const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
+            const forceKeyframe = (outputFrameIdx % Math.round(outputFps * 2) === 0);
+            videoEncoder.encode(videoFrame, { keyFrame: forceKeyframe });
+            videoFrame.close();
+
+            outputFrameIdx++;
+            exportProgress.textContent = `${Math.min(99, Math.round((outputFrameIdx / totalOutputFrames) * 100))}%`;
+          }
+
+          finalizeOfflineExport(muxer, videoEncoder, audioEncoder);
+        }
+
+        sourceVideo.playbackRate = 4.0; // 4x High-Speed GPU Decoding
+        sourceVideo.play().then(() => {
+          sourceVideo.requestVideoFrameCallback(processFastStreamFrame);
+        }).catch(() => {
+          encodeNextFrameFallback();
+        });
+      } else {
+        encodeNextFrameFallback();
+      }
+
+      async function encodeNextFrameFallback() {
         if (!state.isProcessing) return;
 
         if (outputFrameIdx >= totalOutputFrames) {
-          // Finished encoding all video frames!
           finalizeOfflineExport(muxer, videoEncoder, audioEncoder);
           return;
         }
 
-        // Respect queue limits to prevent GPU overflow and hangs
         if (videoEncoder.encodeQueueSize > 15) {
-          videoEncoder.addEventListener('dequeue', encodeNextFrame, { once: true });
+          videoEncoder.addEventListener('dequeue', encodeNextFrameFallback, { once: true });
           return;
         }
 
-        // Update progress UI
-        const progressPct = Math.min(99, Math.round((outputFrameIdx / totalOutputFrames) * 100));
-        exportProgress.textContent = `${progressPct}%`;
-
-        // Calculate playback time of this frame in output file
+        exportProgress.textContent = `${Math.min(99, Math.round((outputFrameIdx / totalOutputFrames) * 100))}%`;
         const playTimeOfFrame = outputFrameIdx / outputFps;
 
         let targetTime = 0;
@@ -1987,12 +2121,10 @@ async function startProcessing() {
           outroTime = playTimeOfFrame - baseTargetDuration;
         }
 
-        // Wait for seeked event
         const onSeeked = async () => {
           sourceVideo.removeEventListener('seeked', onSeeked);
 
           state.frameCounter = outputFrameIdx; 
-          
           renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
           renderCtx.filter = 'url(#color-shift-filter)';
           renderCtx.save();
@@ -2025,7 +2157,6 @@ async function startProcessing() {
           renderCtx.filter = 'none';
 
           if (!isOutroFrame) {
-            // Apply main video overlays & TikTok 2-corner watermark
             if (state.dirtOpacity > 0) drawDirtOverlay();
             if (state.staticOpacity > 0) drawStaticOverlay();
             if (state.glitchIntensity > 0) drawGlitchOverlay();
@@ -2035,20 +2166,17 @@ async function startProcessing() {
               drawWatermarkOverlay(renderCtx, renderCanvas.width, renderCanvas.height, targetTime, state.videoDuration);
             }
           } else {
-            // Draw Appended 6-Second Outro Screen
             drawOutroOverlay(renderCtx, renderCanvas.width, renderCanvas.height, outroTime);
           }
 
           const frameTimestampUs = Math.round(playTimeOfFrame * 1000000);
           const videoFrame = new VideoFrame(renderCanvas, { timestamp: frameTimestampUs });
-
           const forceKeyframe = (outputFrameIdx % Math.round(outputFps * 2) === 0);
           videoEncoder.encode(videoFrame, { keyFrame: forceKeyframe });
           videoFrame.close();
 
           outputFrameIdx++;
-
-          setTimeout(encodeNextFrame, 0);
+          setTimeout(encodeNextFrameFallback, 0);
         };
 
         if (Math.abs(sourceVideo.currentTime - targetTime) < 0.001) {
